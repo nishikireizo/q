@@ -174,7 +174,7 @@
   .badge-blue { background: var(--accent-bg); color: var(--accent); border: 1px solid var(--accent-mid); }
   .badge-move { background: var(--accent); color: #fff; border: 1px solid var(--accent); }
   /* 記録 — 商品ページの 表と 同じ 中身を スマホの 幅で（横に 動かさない）: 日付 | 内容（引取先・運送・担当・伝票）| 数・残り */
-  .kv-h, .kv { display: grid; grid-template-columns: 62px minmax(0, 1fr) auto; gap: 8px; align-items: start; }
+  .kv-h, .kv { display: grid; grid-template-columns: 56px minmax(0, 1fr) auto; gap: 8px; align-items: start; }
   .kv-h { font-size: 11px; font-weight: 700; color: var(--muted); padding: 0 2px 5px; border-bottom: 1px solid var(--border); }
   .kv-h span:last-child { text-align: right; }
   .kv { padding: 8px 2px; border-bottom: 1px solid #edf3f6; font-size: 13px; font-weight: 500; }
@@ -610,7 +610,7 @@
   function kirokuRow(x) {
     var has = function (v) { return v !== "" && v != null; };
     var sub = x.sub.filter(has).map(esc).join(" · ");
-    return '<div class="kv' + (x.cx ? " cx" : "") + '"><div class="kv-d">' + esc(x.d) + (x.t ? "<span>" + esc(x.t) + "</span>" : "") + "</div>" +
+    return '<div class="kv' + (x.cx ? " cx" : "") + '"><div class="kv-d">' + esc(inDay(x.d)) + (x.t ? "<span>" + esc(x.t) + "</span>" : "") + "</div>" +
       '<div><div class="kv-k">' + x.kind + (x.cx ? ' <span class="kr-tag">取消</span>' : "") + "</div>" + (sub ? '<div class="kv-sub">' + sub + "</div>" : "") + "</div>" +
       '<div class="kv-n">' + (has(x.qty) ? '<span class="kv-q">' + esc(x.qty) + "</span>" : "") + (has(x.left) ? '<span class="kv-left">残り ' + esc(x.left) + "</span>" : "") + "</div></div>";
   }
@@ -807,7 +807,7 @@
 
   // ── 新しい 版が 出ていたら 読み直す（ホーム画面の アプリは 古い 版を しばらく 覚えている）──
   // 開いた 時だけ（カメラを 開いた 後に 読み直すと また 許可を 聞くので）。同じ 版へは 1回だけ（ループ しない）。
-  var VERSION = "2026-11-09c";
+  var VERSION = "2026-11-09d";
   $("verLbl").textContent = "版 " + VERSION;
   function checkUpdate() {
     if (!window.fetch) return;
