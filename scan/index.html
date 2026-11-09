@@ -199,6 +199,63 @@
   .kr-tag { display: inline-block; font-size: 10.5px; font-weight: 700; border-radius: 5px; padding: 0 6px; background: #eef1f4; color: var(--muted); }
   .kr-tag.yy { background: var(--amber-bg); color: var(--amber); }
   .ver { font: 10px var(--mono); color: var(--muted); margin-top: 6px; }
+  /* ══ メニュー ══ */
+  .backbtn { flex: none; width: 40px; height: 40px; padding: 0; font-size: 20px; font-weight: 700; color: var(--accent); border-color: var(--accent-mid); }
+  .menu { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; padding: 12px; }
+  .tile { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-height: 128px; padding: 16px; text-align: left;
+          background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 4px 14px rgba(35,64,58,.08); }
+  .tile .ti { font-size: 30px; line-height: 1; }
+  .tile b { font-size: 20px; color: var(--accent); }
+  .tile span:last-child { font-size: 12px; color: var(--text-2); line-height: 1.4; }
+  .tile.soon { opacity: .55; box-shadow: none; }
+  /* ══ 出庫 ピッキング ══ */
+  #pickView { padding: 0 12px; }
+  .pk-date { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 0 0 8px; }
+  .pk-date b { font-size: 15px; }
+  .pk-sum { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--text-2); margin: 4px 2px 6px; }
+  .pk-sum .err { color: var(--red); }
+  .pk-hint { font-size: 12px; color: var(--muted); margin: 0 2px 8px; }
+  .slip { display: block; width: 100%; text-align: left; margin-bottom: 8px; padding: 12px 14px; background: var(--surface);
+          border: 1px solid var(--border); border-radius: 14px; }
+  .slip.done { background: var(--surface-2); }
+  .slip.done .slip-cl, .slip.done .slip-time { color: var(--muted); }
+  .slip-top { display: flex; align-items: baseline; gap: 10px; }
+  .slip-time { font: 500 15px var(--mono); color: var(--text-2); flex: none; }
+  .slip-cl { flex: 1; min-width: 0; font-size: 16px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .slip-n { flex: none; font: 700 14px var(--mono); color: var(--muted); }
+  .slip-n.mid { color: var(--amber); }
+  .slip-n.ok { color: var(--accent); font-family: inherit; }
+  .slip-sub { font-size: 12px; color: var(--text-2); margin: 3px 0 7px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pbar { height: 5px; border-radius: 3px; background: var(--surface-2); border: 1px solid var(--border); overflow: hidden; }
+  .pbar i { display: block; height: 100%; background: var(--accent); }
+  .pbar.big { height: 8px; margin-top: 2px; }
+  .pk-cl { font-family: inherit; font-size: 22px; font-weight: 700; letter-spacing: 0; }
+  .pk-msg { margin: 0 0 10px; padding: 11px 14px; border-radius: 12px; font-size: 14px; font-weight: 700; line-height: 1.5; border: 1px solid; }
+  .pk-msg.ok { background: var(--accent-bg); border-color: var(--accent-mid); color: var(--accent); }
+  .pk-msg.warn { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .pk-msg.bad { background: var(--red-bg); border-color: var(--red-border); color: var(--red); font-size: 15px; }
+  .pk-code { display: inline-block; font: 500 12px var(--mono); padding: 0 6px; margin-right: 6px; border-radius: 5px; background: rgba(255,255,255,.7); }
+  .pk-done { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin: 0 0 10px; padding: 14px; border-radius: 14px;
+             background: var(--accent); color: #fff; font-size: 16px; font-weight: 700; }
+  .pk-lines { padding-bottom: 6px; }
+  .pl { display: grid; grid-template-columns: 74px minmax(0, 1fr) auto 26px; gap: 8px; align-items: center; padding: 10px 2px;
+        border-bottom: 1px solid #edf3f6; cursor: pointer; }
+  .pl.last { background: var(--accent-bg); border-radius: 10px; }
+  .pl-loc { font: 700 20px var(--mono); color: var(--accent); line-height: 1.1; word-break: break-all; }
+  .pl-id { font: 500 14px var(--mono); }
+  .pl-name { font-size: 13px; font-weight: 500; line-height: 1.4; word-break: break-word; }
+  .pl-in { font-size: 11px; color: var(--muted); }
+  .pl-fifo { margin-top: 4px; font-size: 12px; font-weight: 700; color: var(--amber); background: var(--amber-bg); border: 1px solid var(--amber-border);
+             border-radius: 8px; padding: 3px 7px; line-height: 1.45; }
+  .pl-qty { text-align: right; line-height: 1.1; }
+  .pl-qty b { display: block; font: 700 22px var(--mono); }
+  .pl-qty span { font-size: 11px; color: var(--muted); }
+  .pl-st { width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--border); text-align: center; font: 700 15px/22px inherit; color: #fff; }
+  .pl.ok .pl-st { background: var(--accent); border-color: var(--accent); }
+  .pl.ok .pl-loc, .pl.ok .pl-name, .pl.ok .pl-id, .pl.ok .pl-qty b { color: var(--muted); }
+  .pk-foot { text-align: center; padding-top: 10px; }
+  .pk-q { margin: 0 0 10px; padding: 8px 12px; border-radius: 10px; font-size: 13px; font-weight: 700; background: var(--amber-bg); color: var(--amber); border: 1px dashed var(--amber-border); }
+  .slip-who { color: var(--accent); font-weight: 700; }
   @media (max-width: 360px) { .hero-number, .stock-num { font-size: 24px; } }
 </style>
 </head>
@@ -232,10 +289,24 @@
   <!-- スキャン -->
   <div id="vMain" class="hidden">
     <div class="bar">
-      <div><div class="title">スキャン</div><div class="sub" id="mnUser"></div></div>
-      <span class="pill off" id="mnPill">タップで スキャン待ち</span>
+      <div style="display:flex;align-items:center;gap:10px;min-width:0">
+        <button type="button" class="backbtn hidden" id="backBtn" aria-label="もどる">←</button>
+        <div style="min-width:0"><div class="title" id="mnTitle">メニュー</div><div class="sub" id="mnUser"></div></div>
+      </div>
+      <span class="pill off hidden" id="mnPill">タップで スキャン待ち</span>
     </div>
-    <div class="bar" style="padding:10px 16px">
+    <!-- メニュー -->
+    <div id="homeView">
+      <div class="menu">
+        <button type="button" class="tile" data-mode="shukko"><span class="ti">🚚</span><b>出庫</b><span>ピッキング・先入れ先出し</span></button>
+        <button type="button" class="tile soon" data-mode="nyuko"><span class="ti">📦</span><b>入庫</b><span>部屋・場所の 入力（準備中）</span></button>
+        <button type="button" class="tile soon" data-mode="tana"><span class="ti">📋</span><b>棚卸</b><span>（準備中）</span></button>
+        <button type="button" class="tile" data-mode="lookup"><span class="ti">🔍</span><b>在庫 検索</b><span>ラベルで 場所・在庫・記録</span></button>
+      </div>
+      <div class="msg" id="homeMsg" style="text-align:center"></div>
+    </div>
+    <div id="workView" class="hidden">
+    <div class="bar" id="clientBar" style="padding:10px 16px">
       <div style="min-width:0">
         <div class="sub">得意先（ラベルで 決まる）</div>
         <div style="font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" id="mnClient"></div>
@@ -260,9 +331,13 @@
       <div class="frame"></div>
       <div class="camfoot"><span id="camMsg">QR を 枠に 入れて ください</span><button type="button" id="camClose">閉じる</button></div>
     </div>
-    <div class="box card" id="card"></div>
-    <div class="recent-h" id="recentH"></div>
-    <div id="recent"></div>
+    <div id="lookupView">
+      <div class="box card" id="card"></div>
+      <div class="recent-h" id="recentH"></div>
+      <div id="recent"></div>
+    </div>
+    <div id="pickView" class="hidden"></div>
+    </div>
     <div class="foot"><button type="button" class="link" id="logoutBtn">この 端末の ログインを やめる</button><div class="ver" id="verLbl"></div></div>
   </div>
 </div>
@@ -321,6 +396,20 @@
       .catch(function (e) {
         if (e.auth || e.final || tries >= WAIT.length) throw e;
         return new Promise(function (res) { setTimeout(res, WAIT[tries]); }).then(function () { return apiGet(params, tries + 1); });
+      });
+  }
+
+  // 書く 時は POST（本文に トークン）。失敗は 書いた か わからない ので やり直さない（呼ぶ 側が 貯めて 送り直す）
+  function apiPost(body) {
+    var b = {}; for (var k in body) b[k] = body[k];
+    b.t = token;
+    return fetch(API, { method: "POST", body: JSON.stringify(b), credentials: "omit", cache: "no-store" })
+      .then(function (r) { return r.text(); })
+      .then(function (txt) {
+        var j; try { j = JSON.parse(txt); } catch (e) { throw new Error("Google の サーバーが 一時的に 失敗しました"); }
+        if (j && j.auth === false) { logout("この 端末の 登録が 切れました — もう一度 ログイン してください"); var a = new Error("auth"); a.auth = true; throw a; }
+        if (!j || !j.ok) { var x = new Error((j && j.error) || "送れませんでした"); x.final = true; throw x; }
+        return j;
       });
   }
 
@@ -391,13 +480,14 @@
     $("card").className = "box card";
     $("card").innerHTML = '<div class="hint">ラベルを スキャン してください<br><span class="sub">得意先は ラベルで 決まります・📷 カメラ・⌨ 打つ（例 27-10001）</span></div>';
     loadClients();
-    focusScan();
+    setMode("home");
   }
   function renderHeader() {
     $("mnClient").textContent = cur ? clientLabel(cur) : "— まだ ありません";
     var L = cur && lists[cur], n = L ? Object.keys(L.items).length : 0;
     $("mnList").textContent = !L ? "" : L.loading ? (n ? n + "品・更新中…" : "先読み中…") : (L.at ? n + "品 " + hhmm(L.at) : "");
     $("mnReload").classList.toggle("hidden", !cur);
+    if (typeof mode !== "undefined" && mode === "shukko" && pk.open) renderPick();
   }
   // この 得意先の 商品を 使えるように（覚えている 先読み → すぐ・古ければ / 無ければ 読み直す）
   function useClient(c, force) {
@@ -494,6 +584,7 @@
     if (!p) return;
     if (p.noClient) { $("scanErr").textContent = "品番だけでは 得意先が わかりません — 27-10001 の 形で"; beep(false); return; }
     if (p.bad) { $("scanErr").textContent = "読めない ラベル: " + p.bad.slice(0, 60); beep(false); return; }
+    if (mode === "shukko") { pickScan(String(p.c), String(p.id)); return; }
     showItem(String(p.c), String(p.id));
   }
 
@@ -641,6 +732,270 @@
     area.innerHTML = '<div class="kv-h"><span>日付</span><span>内容</span><span>数・残り在庫</span></div>' + ev.map(kirokuRow).join("");
     hist.innerHTML = locHistHtml(k.d.loc);
   }
+  // ══ メニュー（出庫・入庫・棚卸・在庫 検索）══
+  var mode = "home";
+  var MODE_TITLE = { home: "メニュー", lookup: "在庫 検索", shukko: "出庫" };
+  function setMode(m) {
+    mode = m;
+    $("homeView").classList.toggle("hidden", m !== "home");
+    $("workView").classList.toggle("hidden", m === "home");
+    $("lookupView").classList.toggle("hidden", m !== "lookup");
+    $("clientBar").classList.toggle("hidden", m !== "lookup");
+    $("pickView").classList.toggle("hidden", m !== "shukko");
+    $("backBtn").classList.toggle("hidden", m === "home");
+    $("mnPill").classList.toggle("hidden", m === "home");
+    $("mnTitle").textContent = MODE_TITLE[m] || "";
+    $("scanErr").textContent = ""; $("homeMsg").textContent = "";
+    if (m === "home") closeCam();
+    if (m === "shukko") pickEnter();
+    if (m !== "home") focusScan();
+    window.scrollTo(0, 0);
+  }
+  $("homeView").addEventListener("click", function (e) {
+    var b = e.target.closest("[data-mode]"); if (!b) return;
+    unlockAudio();
+    if (b.classList.contains("soon")) { $("homeMsg").textContent = b.querySelector("b").textContent + " は 準備中です"; return; }
+    setMode(b.getAttribute("data-mode"));
+  });
+  $("backBtn").addEventListener("click", function () {
+    if (mode === "shukko" && pk.open) { pk.open = ""; pk.msg = null; renderPick(); window.scrollTo(0, 0); focusScan(); return; }
+    setMode("home");
+  });
+
+  // ══ 出庫 ピッキング（upload 118）══
+  //  その 日の 出庫（PC の 出庫入力で 作った 伝票）を 開いて、品物の ラベルを 1回 読むと その 行に ✓（数は 大きく 出す）。
+  //  ・ちがう 得意先・この 伝票に ない 品番・同じ 商品の ちがう ロット → 赤で 止める（低い 音 2回）。
+  //  ・伝票の ロットより 古い ロットが 在庫に ある（先入れ先出し）→ 黄色で 知らせる だけ（✓ は つく）。
+  //  ・一覧で ラベルを 読むと、その 品番が 入った 伝票が 開く。
+  //  ・✓ は サーバー（シート「ピッキング記録」）に 送る → ほかの スマホ・PC でも 見える（20秒ごとに 読み直す）。
+  //    電波が 無い 時は この 端末に 貯めて あとで 送る（未送信 n）。
+  var PQ_KEY = "nishiki_scan_pickq";
+  var pk = { date: dayStr(new Date()), slips: null, loadedDate: "", loading: false, err: "", open: "", msg: null, seq: 0,
+             server: {}, serverDate: "", sending: false, timer: null, ver: 0 };
+  var pickQ = (lsJson(PQ_KEY) || []).filter(function (q) { return Date.now() - q.at < 7 * 864e5; });
+  var WD = "日月火水木金土";
+  function dayStr(d) { return d.getFullYear() + "/" + ("0" + (d.getMonth() + 1)).slice(-2) + "/" + ("0" + d.getDate()).slice(-2); }
+  function dayShift(s, n) { var a = s.split("/"); return dayStr(new Date(+a[0], a[1] - 1, +a[2] + n)); }
+  function dayLabel(s) {
+    var a = s.split("/"), d = new Date(+a[0], a[1] - 1, +a[2]);
+    return a[0].slice(2) + "/" + a[1] + "/" + a[2] + "（" + WD[d.getDay()] + "）" + (s === dayStr(new Date()) ? " 今日" : "");
+  }
+  function dateNum(s) { var m = String(s || "").match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/); return m ? +m[1] * 10000 + +m[2] * 100 + +m[3] : 0; }
+  function locKey(s) { return String(s || "～").replace(/\d+/g, function (n) { return ("0000" + n).slice(-5); }); }
+  function normName(s) { return normalize(s).toLowerCase(); }
+  function slipByKey(k) { return (pk.slips || []).filter(function (s) { return s.key === k; })[0] || null; }
+  function unitOf(c, id) { var it = lists[c] && lists[c].items[id]; return (it && it.nishikata) || ""; }
+  function pickMsg(kind, code, text, line) { pk.msg = { kind: kind, code: code, text: text, line: line || "" }; }
+  function saveQ() { lsSet(PQ_KEY, JSON.stringify(pickQ)); }
+
+  // いまの ✓ = サーバーの ✓ ＋ まだ 送って いない 分
+  function slipLines(s) {
+    var m = {}, sv = (pk.serverDate === pk.date && pk.server[s.key]) || {};
+    Object.keys(sv).forEach(function (id) { m[id] = sv[id]; });
+    pickQ.forEach(function (q) {
+      if (q.date !== pk.date || q.key !== s.key) return;
+      if (q.on) m[q.id] = { at: q.at, by: user, hand: q.hand, wait: true }; else delete m[q.id];
+    });
+    return m;
+  }
+  function slipCount(s) { var m = slipLines(s), n = 0; s.lines.forEach(function (l) { if (m[l.id]) n++; }); return n; }
+  function slipWho(s) {
+    var m = slipLines(s), by = {}, last = null;
+    Object.keys(m).forEach(function (id) { by[m[id].by || "?"] = 1; if (!last || m[id].at > last.at) last = m[id]; });
+    return { names: Object.keys(by), last: last };
+  }
+
+  function pickEnter() {
+    if (!pk.slips || pk.loadedDate !== pk.date) loadSlips(); else { renderPick(); refreshPicks(); }
+    clearInterval(pk.timer);
+    pk.timer = setInterval(function () { if (mode === "shukko" && !document.hidden) { refreshPicks(); flushQ(); } }, 20000);
+  }
+  // 古い 返事で 新しい ✓ を 消さない: 読み始めた 後に ✓ を 送った / 送って いる 時は その 返事の ✓ は 使わない
+  function freshPicks(date, v) { return pk.serverDate !== date || (pk.ver === v && !pk.sending && !pickQ.length); }
+  function loadSlips() {
+    var my = ++pk.seq, date = pk.date, v = pk.ver;
+    pk.loading = true; pk.err = ""; renderPick();
+    apiGet({ api: "shukko", date: date }).then(function (j) {
+      if (my !== pk.seq) return;
+      pk.slips = (j.slips || []).map(function (s) {
+        s.c = String(s.c); s.lines = (s.lines || []).filter(function (l) { return Number(l.qty) > 0; });
+        s.lines.forEach(function (l) { l.id = String(l.id); });
+        return s;
+      }).filter(function (s) { return s.lines.length; })
+        .sort(function (a, b) { return a.time < b.time ? -1 : a.time > b.time ? 1 : Number(a.c) - Number(b.c); });
+      if (freshPicks(date, v)) { pk.server = j.picks || {}; pk.serverDate = date; }
+      pk.loadedDate = date;
+      if (pk.open && !slipByKey(pk.open)) pk.open = "";
+    }).catch(function (e) { if (my === pk.seq && !e.auth) pk.err = e.message || String(e); })
+      .then(function () { if (my === pk.seq) { pk.loading = false; renderPick(); flushQ(); } });
+  }
+  // ✓ だけ 読み直す（軽い）— ほかの スマホの ✓ も 出る
+  function refreshPicks() {
+    var date = pk.date, v = pk.ver;
+    apiGet({ api: "picks", date: date }).then(function (j) {
+      if (date !== pk.date || !freshPicks(date, v)) return;
+      pk.server = j.picks || {}; pk.serverDate = date; renderPick();
+    }).catch(function () {});
+  }
+  // 貯めた ✓ を 順に 送る
+  function flushQ() {
+    if (pk.sending || !pickQ.length) return;
+    var q = pickQ[0];
+    pk.sending = true;
+    apiPost({ api: "pick", date: q.date, key: q.key, client: q.c, id: q.id, on: q.on, hand: q.hand })
+      .then(function (j) {
+        pickQ.shift(); saveQ(); pk.ver++;
+        if (q.date === pk.date && pk.serverDate === pk.date) pk.server[q.key] = j.lines || {};
+        pk.sending = false; renderPick(); flushQ();
+      })
+      .catch(function (e) {
+        pk.sending = false;
+        if (e && e.final) { pickQ.shift(); saveQ(); pickMsg("bad", q.c + "-" + q.id, "送れませんでした: " + e.message); renderPick(); flushQ(); }
+        else renderPick();   // 電波など — 次に また 送る
+      });
+  }
+  function queuePick(s, id, on, hand) {
+    pickQ.push({ date: pk.date, key: s.key, c: s.c, id: id, on: !!on, hand: !!hand, at: Date.now() }); pk.ver++;
+    saveQ(); flushQ();
+  }
+
+  function openSlip(key) {
+    var s = slipByKey(key); if (!s) return null;
+    pk.open = key; pk.msg = null;
+    useClient(s.c, false);   // 先入れ先出しの ために その 得意先の 商品を 先読み（覚えて いれば すぐ）
+    refreshPicks();
+    return s;
+  }
+
+  // 先入れ先出し: 同じ 商品名で 入庫日が 古く、在庫（予約を 引いた 数）が ある ロット（この 伝票の 品番は 除く）
+  function olderLots(s, l) {
+    var L = lists[s.c]; if (!L || !L.items) return [];
+    var nm = normName(l.name), d0 = dateNum(l.nyukoDate), mine = {};
+    if (!nm || !d0) return [];
+    s.lines.forEach(function (x) { mine[x.id] = 1; });
+    return Object.keys(L.items).map(function (k) { return L.items[k]; }).filter(function (it) {
+      var d = dateNum(it.nyukoDate);
+      return !mine[String(it.number)] && normName(it.name) === nm && realStock(it) > 0 && d && d < d0;
+    }).sort(function (a, b) { return dateNum(a.nyukoDate) - dateNum(b.nyukoDate); });
+  }
+
+  function renderPick() {
+    if (mode !== "shukko") return;
+    var s = pk.open && slipByKey(pk.open);
+    $("mnTitle").textContent = s ? "出庫 ピッキング" : "出庫";
+    if (s) renderSlip(s); else renderSlipList();
+  }
+  function msgHtml() {
+    var m = pk.msg; if (!m) return "";
+    return '<div class="pk-msg ' + m.kind + '"><span class="pk-code">' + esc(m.code) + "</span>" + esc(m.text) + "</div>";
+  }
+  function qNote() {
+    var n = pickQ.filter(function (q) { return q.date === pk.date; }).length;
+    return n ? '<div class="pk-q">📶 未送信 ' + n + " — 電波が 戻ったら 送ります</div>" : "";
+  }
+  function renderSlipList() {
+    var slips = pk.slips || [], done = 0;
+    slips.forEach(function (s) { if (slipCount(s) === s.lines.length) done++; });
+    $("pickView").innerHTML =
+      '<div class="pk-date"><button type="button" class="refresh-btn" data-pk="prev">‹ 前の日</button><b>' + esc(dayLabel(pk.date)) +
+        '</b><button type="button" class="refresh-btn" data-pk="next">次の日 ›</button></div>' +
+      msgHtml() + qNote() +
+      '<div class="pk-sum">' + (pk.loading ? "読み込み中…" : pk.err ? '<span class="err">読めませんでした: ' + esc(pk.err) + "</span>" :
+        "伝票 " + slips.length + "・完了 " + done) + '<button type="button" class="link" data-pk="reload">↻ 読み直す</button></div>' +
+      (!pk.loading && !pk.err && !slips.length ? '<div class="hint">この 日の 出庫は ありません</div>' : "") +
+      (slips.length ? '<div class="pk-hint">伝票を えらぶ か、品物の ラベルを スキャン → その 品番の 伝票が 開きます</div>' : "") +
+      slips.map(function (s) {
+        var n = slipCount(s), all = s.lines.length, ok = n === all, who = slipWho(s);
+        return '<button type="button" class="slip' + (ok ? " done" : "") + '" data-slip="' + esc(s.key) + '">' +
+          '<div class="slip-top"><span class="slip-time">' + esc(s.time || "—") + '</span><span class="slip-cl">' + esc(s.client) + "</span>" +
+            '<span class="slip-n' + (ok ? " ok" : n ? " mid" : "") + '">' + (ok ? "✓ 完了" : n + " / " + all) + "</span></div>" +
+          '<div class="slip-sub">' + esc([s.hikitori, s.unso, s.tantou].filter(Boolean).join(" · ") || "—") + " · " + all + " 行" +
+            (who.names.length ? ' <span class="slip-who">' + (ok ? "✓ " : "ピッキング中 ") + esc(who.names.join("・")) + "</span>" : "") + "</div>" +
+          '<div class="pbar"><i style="width:' + Math.round(n * 100 / all) + '%"></i></div></button>';
+      }).join("");
+  }
+  function renderSlip(s) {
+    var m = slipLines(s), n = slipCount(s), all = s.lines.length, ok = n === all;
+    var lines = s.lines.slice().sort(function (a, b) { var x = locKey(a.loc), y = locKey(b.loc); return x < y ? -1 : x > y ? 1 : 0; });
+    var ats = Object.keys(m).map(function (k) { return m[k].at || 0; }).filter(Boolean);
+    var took = ok && ats.length > 1 ? Math.round((Math.max.apply(null, ats) - Math.min.apply(null, ats)) / 1000) : 0;
+    $("pickView").innerHTML =
+      '<div class="hero pk-hero"><div class="hero-top"><div style="flex:1;min-width:0">' +
+          '<div class="hero-eyebrow"><span>出庫 · ' + esc(dayLabel(pk.date)) + " · " + esc(s.time || "") + "</span></div>" +
+          '<div class="hero-number pk-cl">' + esc(s.client) + "</div>" +
+          '<div class="hero-name">' + esc([s.hikitori, s.unso, s.tantou].filter(Boolean).join(" · ") || "—") + "</div>" +
+        "</div>" +
+        '<div class="stock-pill' + (ok ? "" : n ? " low" : " zero") + '"><div class="stock-num">' + n + "/" + all + '</div><div class="stock-label">チェック</div></div>' +
+      '</div><div class="pbar big"><i style="width:' + Math.round(n * 100 / all) + '%"></i></div></div>' +
+      msgHtml() + qNote() +
+      (ok ? '<div class="pk-done">✓ 全部 そろいました（' + all + " 行" + (took ? "・" + Math.floor(took / 60) + "分" + (took % 60) + "秒" : "") + '）<button type="button" class="refresh-btn" data-pk="close">伝票 一覧へ</button></div>' : "") +
+      '<div class="pane active pk-lines"><div class="sec-head">場所の 順・ラベルを 読むと ✓</div>' +
+      lines.map(function (l) {
+        var d = m[l.id], old = olderLots(s, l), u = unitOf(s.c, l.id);
+        return '<div class="pl' + (d ? " ok" : "") + (pk.msg && pk.msg.line === l.id ? " last" : "") + '" data-line="' + esc(l.id) + '">' +
+          '<div class="pl-loc">' + esc(l.loc || "—") + "</div>" +
+          '<div class="pl-main"><div class="pl-id">' + esc(l.id) + (l.yoyaku ? ' <span class="kr-tag yy">予約</span>' : "") + "</div>" +
+            '<div class="pl-name">' + esc(l.name) + "</div>" +
+            '<div class="pl-in">入庫 ' + esc(inDay(l.nyukoDate) || "—") +
+              (d ? " · ✓ " + esc(d.by || "") + (d.at ? " " + hhmm(d.at) : "") + (d.hand ? "（手）" : "") + (d.wait ? " 未送信" : "") : "") + "</div>" +
+            (old.length && !d ? '<div class="pl-fifo">⚠ 先入れ先出し: もっと 古い ロット ' + esc(old[0].number) + "（" + esc(inDay(old[0].nyukoDate)) + " 入庫・" +
+              esc(old[0].location || "場所なし") + "・在庫 " + realStock(old[0]) + "）" + (old.length > 1 ? " ほか " + (old.length - 1) : "") + "</div>" : "") +
+          "</div>" +
+          '<div class="pl-qty"><b>' + esc(l.qty) + "</b><span>" + esc(u) + "</span></div>" +
+          '<div class="pl-st">' + (d ? "✓" : "") + "</div></div>";
+      }).join("") +
+      '<div class="pk-foot"><button type="button" class="link" data-pk="reset">この 伝票の チェックを やり直す</button></div></div>';
+  }
+
+  // ラベルを 読んだ 時（出庫 モード）
+  function pickScan(c, id) {
+    var code = c + "-" + id;
+    if (!pk.slips) { pickMsg("bad", code, "伝票を 読み込み中です — 少し 待って もう一度"); beep(false); renderPick(); return; }
+    var s = pk.open && slipByKey(pk.open);
+    if (!s) {   // 一覧 — その 品番の 伝票を 開く（まだ 終わって いない 方を 先に）
+      var hits = pk.slips.filter(function (x) { return x.c === c && x.lines.some(function (l) { return l.id === id; }); });
+      if (!hits.length) { pickMsg("bad", code, "この 日の 伝票に ない 品番です"); beep(false); renderPick(); return; }
+      s = openSlip((hits.filter(function (x) { return slipCount(x) < x.lines.length; })[0] || hits[0]).key);
+      window.scrollTo(0, 0);
+    }
+    if (c !== s.c) { pickMsg("bad", code, "得意先が ちがいます — この 伝票は " + s.client); beep(false); renderPick(); return; }
+    var l = s.lines.filter(function (x) { return x.id === id; })[0];
+    if (!l) {
+      var it = lists[c] && lists[c].items[id];
+      var same = it ? s.lines.filter(function (x) { return normName(x.name) === normName(it.name); })[0] : null;
+      pickMsg("bad", code, same ? "ロットが ちがいます — 伝票は " + same.id + "（" + inDay(same.nyukoDate) + " 入庫・" + (same.loc || "場所なし") + "）"
+                               : "この 伝票に ない 品番です" + (it ? "（" + it.name + "）" : ""));
+      beep(false); renderPick(); return;
+    }
+    var had = slipLines(s)[l.id];
+    if (had) { pickMsg("warn", code, "もう チェック 済みです（" + (had.by ? had.by + " " : "") + l.name + "）", l.id); beep(false); renderPick(); return; }
+    var old = olderLots(s, l);
+    queuePick(s, l.id, true, false);
+    pickMsg(old.length ? "warn" : "ok", code, "✓ " + l.name + " " + l.qty + " " + unitOf(c, l.id) +
+      (old.length ? " — ⚠ もっと 古い ロット " + old[0].number + "（" + inDay(old[0].nyukoDate) + "・" + (old[0].location || "場所なし") + "）が あります" : ""), l.id);
+    beep(true); renderPick();
+  }
+
+  $("pickView").addEventListener("click", function (e) {
+    var b = e.target.closest("[data-pk], [data-slip], [data-line]"); if (!b) return;
+    var a = b.getAttribute("data-pk"), s = pk.open && slipByKey(pk.open);
+    if (b.hasAttribute("data-slip")) { openSlip(b.getAttribute("data-slip")); renderPick(); window.scrollTo(0, 0); }
+    else if (a === "prev" || a === "next") { pk.date = dayShift(pk.date, a === "prev" ? -1 : 1); pk.open = ""; pk.msg = null; loadSlips(); }
+    else if (a === "reload") { pk.msg = null; loadSlips(); }
+    else if (a === "close") { pk.open = ""; pk.msg = null; renderPick(); window.scrollTo(0, 0); }
+    else if (a === "reset" && s) {
+      var on = slipLines(s);
+      if (!Object.keys(on).length || !confirm("この 伝票の チェックを 全部 消して やり直しますか？（ほかの スマホ・PC からも 消えます）")) return;
+      Object.keys(on).forEach(function (id) { queuePick(s, id, false, true); });
+      pk.msg = null; renderPick();
+    } else if (b.hasAttribute("data-line") && s) {   // ラベルが 読めない 時は 手で
+      var id = b.getAttribute("data-line"), d = slipLines(s)[id];
+      if (d) { if (!confirm(id + " の チェックを 外しますか？")) return; queuePick(s, id, false, true); }
+      else { if (!confirm(id + " を 手で チェック しますか？（ラベルが 読めない 時だけ）")) return; queuePick(s, id, true, true); }
+      pk.msg = null; renderPick();
+    }
+    focusScan();
+  });
   function setState(text, cls) { var el = $("cardState"); if (el) { el.textContent = text; el.className = "state " + (cls || ""); } }
   function flash() { var c = $("card"); c.classList.remove("flash"); void c.offsetWidth; c.classList.add("flash"); }
 
@@ -829,7 +1184,7 @@
 
   // ── 新しい 版が 出ていたら 読み直す（ホーム画面の アプリは 古い 版を しばらく 覚えている）──
   // 開いた 時だけ（カメラを 開いた 後に 読み直すと また 許可を 聞くので）。同じ 版へは 1回だけ（ループ しない）。
-  var VERSION = "2026-11-09f";
+  var VERSION = "2026-11-09g";
   $("verLbl").textContent = "版 " + VERSION;
   function checkUpdate() {
     if (!window.fetch) return;
