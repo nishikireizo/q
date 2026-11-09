@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="スキャン">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#ffffff">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-180.png">
+<title>スキャン</title>
+<!--
+  ニシキ冷蔵 — スキャン画面（ピッキング用・iPhone の ホーム画面に 追加して 使う）
+  ・ラベルの QR「27-10001」（得意先-品番）を Bluetooth スキャナー か カメラで 読む。古い ラベル（アドレス）も 読める。
+  ・最初に 1回 ログイン → 端末トークンを この アプリの 中に 覚える（ホーム画面の アプリは Safari と 別に 覚える）。
+  ・得意先を 選ぶと 全部の 商品を 先読み → スキャンは すぐ 出る。そのあと 1品だけ サーバーで 確かめて 数を 直す。
+  ・データは Google Apps Script（?api=…）から。トークンが ないと 何も 返らない。値段は 来ない。
+  ・?d=デプロイID は メニュー「スキャン画面（iPhone）」の QR から 来る（この ページには 書かない）。
+-->
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f0f2f5; --surface: #ffffff; --surface-2: #f7f8fa; --border: #dde1e9;
+    --text: #1a1d27; --text-2: #6b7280; --muted: #9ca3af;
+    --accent: #2563eb; --accent-bg: #eff6ff; --accent-mid: #bfdbfe;
+    --green: #15803d; --green-bg: #f0fdf4; --green-border: #bbf7d0;
+    --amber: #b45309; --amber-bg: #fffbeb; --amber-border: #fde68a;
+    --red: #b91c1c; --red-bg: #fef2f2; --red-border: #fecaca;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); }
+  body { font-family: -apple-system, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", system-ui, sans-serif;
+         font-size: 15px; line-height: 1.5; min-height: 100vh; }
+  .wrap { max-width: 520px; margin: 0 auto; padding: 0 0 32px; }
+  .hidden { display: none !important; }
+  button { font: inherit; color: var(--text); background: var(--surface); border: 1px solid var(--border);
+           border-radius: 10px; padding: 9px 12px; cursor: pointer; }
+  button:active { transform: scale(0.98); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  input[type=text], input[type=password], input[type=search] {
+    font: inherit; font-size: 16px; width: 100%; height: 46px; padding: 0 12px; color: var(--text);
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px; outline: none; }
+  input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-mid); }
+  .bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 16px;
+         background: var(--surface); border-bottom: 1px solid var(--border); }
+  .title { font-size: 18px; font-weight: 700; }
+  .sub { font-size: 12px; color: var(--text-2); }
+  .pill { font-size: 12px; padding: 4px 10px; border-radius: 999px; white-space: nowrap; border: 1px solid transparent; }
+  .pill.on { background: var(--green-bg); color: var(--green); border-color: var(--green-border); }
+  .pill.off { background: var(--amber-bg); color: var(--amber); border-color: var(--amber-border); }
+  .sec { padding: 12px 16px; }
+  .box { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px; }
+  .msg { font-size: 14px; margin-top: 8px; min-height: 0; }
+  .msg.err { color: var(--red); }
+  .row { display: flex; justify-content: space-between; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+  .row:last-child { border-bottom: 0; }
+  .k { color: var(--text-2); white-space: nowrap; }
+  .v { text-align: right; }
+  .big { font-size: 34px; font-weight: 700; letter-spacing: 0.5px; line-height: 1.15; word-break: break-all; }
+  .tile { border-radius: 12px; padding: 10px 12px; background: var(--surface-2); border: 1px solid var(--border); }
+  .tile .k { font-size: 12px; }
+  .tile.ok { background: var(--green-bg); border-color: var(--green-border); color: var(--green); }
+  .tile.zero { background: var(--red-bg); border-color: var(--red-border); color: var(--red); }
+  .grid2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; margin: 12px 0; }
+  .scanrow { display: flex; gap: 8px; }
+  .scanrow input { flex: 1; min-width: 0; font-size: 17px; border-width: 2px; }
+  .iconbtn { width: 50px; flex: none; padding: 0; font-size: 20px; }
+  .iconbtn.on { background: var(--accent-bg); border-color: var(--accent); }
+  .card { margin: 0 16px 14px; }
+  .card.flash { animation: fl 0.5s ease-out; }
+  @keyframes fl { from { box-shadow: 0 0 0 4px var(--accent-mid); } to { box-shadow: 0 0 0 0 transparent; } }
+  .card.warn { background: var(--red-bg); border-color: var(--red-border); }
+  .state { font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .state.ok { color: var(--green); }
+  .state.upd { color: var(--amber); font-weight: 600; }
+  .recent-h { font-size: 12px; color: var(--text-2); padding: 0 16px 6px; }
+  .rec { display: grid; grid-template-columns: 48px minmax(0, 1fr) 70px 52px; gap: 6px; align-items: center;
+         padding: 9px 16px; border-top: 1px solid var(--border); font-size: 14px; background: var(--surface); }
+  .rec:active { background: var(--surface-2); }
+  .rec .t { font-size: 12px; color: var(--muted); }
+  .rec .n { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rec .s { text-align: right; font-weight: 600; }
+  .rec .s.zero { color: var(--red); }
+  .clist { margin-top: 10px; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: var(--surface); }
+  .citem { display: block; width: 100%; text-align: left; border: 0; border-bottom: 1px solid var(--border); border-radius: 0;
+           padding: 13px 14px; font-size: 16px; background: var(--surface); }
+  .citem:last-child { border-bottom: 0; }
+  .citem b { display: inline-block; min-width: 44px; color: var(--accent); }
+  .hint { text-align: center; color: var(--text-2); padding: 26px 10px; font-size: 14px; }
+  .foot { text-align: center; padding: 18px 16px 0; }
+  .link { background: none; border: 0; color: var(--text-2); font-size: 13px; text-decoration: underline; padding: 4px; }
+  .cam { position: fixed; inset: 0; background: #000; z-index: 50; display: flex; flex-direction: column; }
+  .cam video { flex: 1; width: 100%; object-fit: cover; min-height: 0; }
+  .cam .frame { position: absolute; left: 50%; top: 45%; width: 62vw; height: 62vw; max-width: 300px; max-height: 300px;
+                transform: translate(-50%, -50%); border: 3px solid rgba(255,255,255,0.85); border-radius: 18px; }
+  .cam .camfoot { padding: 14px 16px 26px; display: flex; justify-content: space-between; align-items: center; color: #fff; font-size: 14px; }
+  .cam .camfoot button { background: #fff; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- セットアップ（?d= が 無い） -->
+  <div id="vSetup" class="hidden">
+    <div class="bar"><div class="title">スキャン</div></div>
+    <div class="sec"><div class="box">
+      <b>セットアップ用 QR から 開いてください</b>
+      <p class="sub" style="font-size:14px">PC の メニュー「スキャン画面（iPhone）」に 出る QR を、iPhone の カメラで 読む → Safari で 開く → 共有 → ホーム画面に追加。</p>
+    </div></div>
+  </div>
+
+  <!-- ログイン（1回だけ） -->
+  <div id="vLogin" class="hidden">
+    <div class="bar"><div><div class="title">スキャン</div><div class="sub">この 端末を 登録します（1回だけ）</div></div></div>
+    <div class="sec"><form class="box" id="loginForm" autocomplete="on">
+      <label class="sub" for="lgUser">名前</label>
+      <input type="text" id="lgUser" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false">
+      <div style="height:10px"></div>
+      <label class="sub" for="lgPass">パスワード</label>
+      <input type="password" id="lgPass" autocomplete="current-password">
+      <div class="msg err" id="lgErr"></div>
+      <button type="submit" class="primary" id="lgBtn" style="width:100%;margin-top:12px;height:48px">ログイン して 登録</button>
+      <p class="sub" style="margin:10px 0 0">商品ページ（QR）の ログインと 同じ 名前・パスワード。登録は 90日 有効。</p>
+    </form></div>
+  </div>
+
+  <!-- 得意先を 選ぶ -->
+  <div id="vPick" class="hidden">
+    <div class="bar">
+      <div><div class="title">得意先を 選ぶ</div><div class="sub" id="pkUser"></div></div>
+      <button type="button" id="pkBack" class="hidden">戻る</button>
+    </div>
+    <div class="sec">
+      <input type="search" id="pkFilter" placeholder="番号 か 名前（例 27・扇屋）" autocapitalize="off" autocorrect="off" spellcheck="false">
+      <div class="msg err" id="pkErr"></div>
+      <div class="clist" id="pkList"><div class="hint">読み込み中…</div></div>
+    </div>
+  </div>
+
+  <!-- スキャン -->
+  <div id="vMain" class="hidden">
+    <div class="bar">
+      <div><div class="title">スキャン</div><div class="sub" id="mnUser"></div></div>
+      <span class="pill off" id="mnPill">タップで スキャン待ち</span>
+    </div>
+    <div class="bar" style="padding:10px 16px">
+      <div style="min-width:0">
+        <div class="sub">得意先</div>
+        <div style="font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" id="mnClient"></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;flex:none">
+        <span class="sub" id="mnList"></span>
+        <button type="button" id="mnReload" aria-label="先読みを やり直す" style="padding:6px 9px">↻</button>
+        <button type="button" id="mnChange" style="padding:6px 10px">変更</button>
+      </div>
+    </div>
+    <div class="sec">
+      <div class="scanrow">
+        <input type="text" id="scanIn" inputmode="none" enterkeyhint="go" placeholder="スキャン待ち…"
+               autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+        <button type="button" class="iconbtn" id="kbBtn" aria-label="キーボードで 打つ" title="キーボードで 打つ">⌨</button>
+        <button type="button" class="iconbtn" id="camBtn" aria-label="カメラで 読む" title="カメラで 読む">📷</button>
+      </div>
+      <div class="msg err" id="scanErr"></div>
+    </div>
+    <div class="box card" id="card"><div class="hint">ラベルを スキャン してください<br><span class="sub">Bluetooth スキャナー・📷 カメラ・⌨ 品番を 打つ</span></div></div>
+    <div class="recent-h" id="recentH"></div>
+    <div id="recent"></div>
+    <div class="foot"><button type="button" class="link" id="logoutBtn">この 端末の ログインを やめる</button></div>
+  </div>
+</div>
+
+<!-- カメラ -->
+<div class="cam hidden" id="cam">
+  <video id="camVideo" playsinline muted autoplay></video>
+  <div class="frame"></div>
+  <div class="camfoot"><span id="camMsg">QR を 枠に 入れて ください</span><button type="button" id="camClose">閉じる</button></div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ── 覚えておく もの（この アプリの 中だけ）──
+  var K = { d: "nishiki_scan_d", t: "nishiki_scan_token", u: "nishiki_scan_user", c: "nishiki_scan_client",
+            clients: "nishiki_scan_clients", list: "nishiki_scan_list_", lastUser: "nishiki_scan_lastuser" };
+  function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  function lsDel(k) { try { localStorage.removeItem(k); } catch (e) {} }
+  function lsJson(k) { try { return JSON.parse(lsGet(k) || "null"); } catch (e) { return null; } }
+
+  var D_RE = /^AKfyc[A-Za-z0-9_-]{20,120}$/;
+  var qs = new URLSearchParams(location.search);
+  var dep = qs.get("d");
+  if (dep && D_RE.test(dep)) lsSet(K.d, dep); else dep = lsGet(K.d);
+  if (!dep || !D_RE.test(dep)) dep = null;
+  var API = dep ? "https://script.google.com/macros/s/" + dep + "/exec" : "";
+
+  var token = lsGet(K.t) || "", user = lsGet(K.u) || "";
+  var clients = lsJson(K.clients) || [];
+  var client = lsJson(K.c);              // {number, name}
+  var items = {}, listAt = 0, listLoading = false;
+  var recent = [];
+  var seq = 0, current = null;           // current = {id, item}
+  var kbMode = false;
+
+  function $(id) { return document.getElementById(id); }
+  function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
+  function hhmm(t) { var d = new Date(t); return ("0" + d.getHours()).slice(-2) + ":" + ("0" + d.getMinutes()).slice(-2); }
+  function show(view) { ["vSetup", "vLogin", "vPick", "vMain"].forEach(function (v) { $(v).classList.toggle("hidden", v !== view); }); }
+
+  // ── サーバー（Google Apps Script）──
+  // Google の 一時的な 失敗（HTML の エラー画面・つながらない）は 少し 待って 2回まで やり直す。
+  var WAIT = [800, 2000];
+  function apiGet(params, tries) {
+    tries = tries || 0;
+    var p = {}; for (var k in params) p[k] = params[k];
+    p.t = token;
+    var url = API + "?" + new URLSearchParams(p).toString();
+    return fetch(url, { cache: "no-store", credentials: "omit" })
+      .then(function (r) { return r.text(); })
+      .then(function (txt) {
+        var j; try { j = JSON.parse(txt); } catch (e) { throw new Error("Google の サーバーが 一時的に 失敗しました"); }
+        if (j && j.auth === false) { logout("この 端末の 登録が 切れました — もう一度 ログイン してください"); var a = new Error("auth"); a.auth = true; throw a; }
+        if (!j || !j.ok) { var x = new Error((j && j.error) || "読めませんでした"); x.final = true; throw x; }
+        return j;
+      })
+      .catch(function (e) {
+        if (e.auth || e.final || tries >= WAIT.length) throw e;
+        return new Promise(function (res) { setTimeout(res, WAIT[tries]); }).then(function () { return apiGet(params, tries + 1); });
+      });
+  }
+
+  // ── 音（成功: 高い 音 1回・だめ: 低い 音 2回）──
+  var actx = null;
+  function unlockAudio() {
+    if (actx) return;
+    try { var C = window.AudioContext || window.webkitAudioContext; if (C) actx = new C(); } catch (e) { actx = null; }
+  }
+  function tone(freq, start, len) {
+    var o = actx.createOscillator(), g = actx.createGain();
+    o.frequency.value = freq; o.type = "square"; g.gain.value = 0.06;
+    o.connect(g); g.connect(actx.destination);
+    o.start(actx.currentTime + start); o.stop(actx.currentTime + start + len);
+  }
+  function beep(ok) {
+    if (!actx) return;
+    try { if (actx.state === "suspended") actx.resume(); if (ok) tone(1320, 0, 0.08); else { tone(220, 0, 0.15); tone(220, 0.22, 0.15); } } catch (e) {}
+  }
+
+  // ── ログイン ──
+  function logout(msg) {
+    token = ""; user = "";
+    lsDel(K.t); lsDel(K.u);
+    showLogin(msg || "");
+  }
+  function showLogin(msg) {
+    show("vLogin");
+    $("lgUser").value = lsGet(K.lastUser) || "";
+    $("lgPass").value = "";
+    $("lgErr").textContent = msg || "";
+  }
+  $("loginForm").addEventListener("submit", function (e) {
+    e.preventDefault(); unlockAudio();
+    var u = $("lgUser").value.trim(), pw = $("lgPass").value;
+    if (!u || !pw) { $("lgErr").textContent = "名前と パスワードを 入れてください"; return; }
+    $("lgErr").textContent = ""; $("lgBtn").disabled = true; $("lgBtn").textContent = "確認中…";
+    fetch(API, { method: "POST", body: JSON.stringify({ api: "login", user: u, pass: pw }), credentials: "omit", cache: "no-store" })
+      .then(function (r) { return r.text(); })
+      .then(function (txt) {
+        var j; try { j = JSON.parse(txt); } catch (err) { throw new Error("Google の サーバーが 一時的に 失敗しました — もう一度"); }
+        if (!j.ok || !j.token) throw new Error(j.error || "ログイン できませんでした");
+        token = j.token; user = j.user || u;
+        lsSet(K.t, token); lsSet(K.u, user); lsSet(K.lastUser, u);
+        $("lgPass").value = "";
+        startPick(false);
+      })
+      .catch(function (err) { $("lgErr").textContent = err.message || String(err); })
+      .then(function () { $("lgBtn").disabled = false; $("lgBtn").textContent = "ログイン して 登録"; });
+  });
+  ["lgUser", "lgPass"].forEach(function (id) { $(id).addEventListener("input", function () { $("lgErr").textContent = ""; }); });
+
+  // ── 得意先を 選ぶ ──
+  function startPick(canBack) {
+    show("vPick");
+    $("pkUser").textContent = "この 端末: 登録済み・" + user;
+    $("pkBack").classList.toggle("hidden", !canBack);
+    $("pkFilter").value = ""; $("pkErr").textContent = "";
+    renderClients();
+    apiGet({ api: "clients" }).then(function (j) {
+      clients = j.clients || []; lsSet(K.clients, JSON.stringify(clients));
+      if (j.user) { user = j.user; lsSet(K.u, user); $("pkUser").textContent = "この 端末: 登録済み・" + user; }
+      renderClients();
+    }).catch(function (e) { if (!e.auth) $("pkErr").textContent = "得意先を 読めませんでした: " + e.message; });
+  }
+  function renderClients() {
+    var f = $("pkFilter").value.trim().toLowerCase();
+    var list = clients.filter(function (c) { return !f || String(c.number) === f || (c.number + ". " + c.name).toLowerCase().indexOf(f) >= 0; });
+    $("pkList").innerHTML = list.length
+      ? list.map(function (c) { return '<button type="button" class="citem" data-n="' + esc(c.number) + '"><b>' + esc(c.number) + "</b>" + esc(c.name) + "</button>"; }).join("")
+      : '<div class="hint">' + (clients.length ? "見つかりません" : "読み込み中…") + "</div>";
+  }
+  $("pkFilter").addEventListener("input", renderClients);
+  $("pkBack").addEventListener("click", function () { startMain(); });
+  $("pkList").addEventListener("click", function (e) {
+    var b = e.target.closest(".citem"); if (!b) return;
+    unlockAudio();
+    var c = clientByNumber(b.getAttribute("data-n")); if (!c) return;
+    setClient(c);
+  });
+  function clientByNumber(n) { n = String(n); for (var i = 0; i < clients.length; i++) if (String(clients[i].number) === n) return clients[i]; return null; }
+  function setClient(c) {
+    client = { number: String(c.number), name: c.name };
+    lsSet(K.c, JSON.stringify(client));
+    items = {}; listAt = 0; recent = []; current = null;
+    startMain();
+  }
+
+  // ── スキャン画面 ──
+  function startMain() {
+    show("vMain");
+    $("mnUser").textContent = "この 端末: 登録済み・" + user;
+    $("mnClient").textContent = client.number + ". " + client.name;
+    var cached = lsJson(K.list + client.number);
+    if (cached && cached.items && Date.now() - cached.at < 24 * 3600 * 1000) { setItems(cached.items, cached.at); }
+    renderRecent();
+    if (!current) $("card").innerHTML = '<div class="hint">ラベルを スキャン してください<br><span class="sub">Bluetooth スキャナー・📷 カメラ・⌨ 品番を 打つ</span></div>';
+    preload();
+    focusScan();
+  }
+  function setItems(arr, at) {
+    items = {}; (arr || []).forEach(function (it) { items[String(it.number)] = it; });
+    listAt = at || Date.now();
+    renderListInfo();
+  }
+  function renderListInfo() {
+    var n = Object.keys(items).length;
+    $("mnList").textContent = listLoading ? (n ? n + "品・更新中…" : "先読み中…") : (listAt ? n + "品 " + hhmm(listAt) : "");
+  }
+  function preload() {
+    if (listLoading) return;
+    listLoading = true; renderListInfo();
+    var c = client.number;
+    apiGet({ api: "list", c: c }).then(function (j) {
+      if (!client || client.number !== c) return;
+      setItems(j.items, j.at);
+      lsSet(K.list + c, JSON.stringify({ at: j.at || Date.now(), items: j.items || [] }));
+    }).catch(function (e) {
+      if (!e.auth) $("scanErr").textContent = "先読み できませんでした（スキャンは 1品ずつ 読みます）: " + e.message;
+    }).then(function () { listLoading = false; renderListInfo(); });
+  }
+  $("mnReload").addEventListener("click", function () { $("scanErr").textContent = ""; preload(); focusScan(); });
+  $("mnChange").addEventListener("click", function () { startPick(true); });
+  $("logoutBtn").addEventListener("click", function () {
+    if (!confirm("この 端末の ログインを やめますか？（次は また ログイン）")) return;
+    logout("");
+  });
+
+  // 入力を いつも スキャン待ちに（iPhone は タップの 中でしか focus できない）
+  var scanIn = $("scanIn");
+  function focusScan() { try { scanIn.focus({ preventScroll: true }); } catch (e) { scanIn.focus(); } }
+  function pill() {
+    var on = document.activeElement === scanIn;
+    $("mnPill").className = "pill " + (on ? "on" : "off");
+    $("mnPill").textContent = on ? "スキャン待ち" : "タップで スキャン待ち";
+  }
+  scanIn.addEventListener("focus", pill);
+  scanIn.addEventListener("blur", function () { setTimeout(pill, 0); });
+  $("vMain").addEventListener("click", function (e) {
+    unlockAudio();
+    if (e.target.closest("button, a, input")) return;
+    focusScan();
+  });
+  $("mnPill").addEventListener("click", function () { focusScan(); });
+  $("kbBtn").addEventListener("click", function () {
+    kbMode = !kbMode;
+    scanIn.setAttribute("inputmode", kbMode ? "text" : "none");
+    scanIn.placeholder = kbMode ? "品番を 打って Enter" : "スキャン待ち…";
+    $("kbBtn").classList.toggle("on", kbMode);
+    scanIn.blur(); focusScan();
+  });
+
+  // スキャナーは 打って Enter。Enter が 来ない スキャナー・日本語入力の 時も 少し 止まったら 読む（打つ モードは Enter だけ）。
+  var idleTimer = null;
+  scanIn.addEventListener("keydown", function (e) {
+    if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); clearTimeout(idleTimer); take(); }
+  });
+  scanIn.addEventListener("input", function () {
+    $("scanErr").textContent = "";
+    clearTimeout(idleTimer);
+    if (kbMode) return;
+    idleTimer = setTimeout(function () { if (looksComplete(scanIn.value)) take(); }, 300);
+  });
+  function take() { var v = scanIn.value; scanIn.value = ""; if (v.trim()) handle(v); }
+
+  function normalize(s) {
+    return String(s || "")
+      .replace(/[！-～]/g, function (ch) { return String.fromCharCode(ch.charCodeAt(0) - 0xFEE0); })
+      .replace(/[‐-―−ーｰ]/g, "-")
+      .replace(/\s+/g, "");
+  }
+  function looksComplete(s) { s = normalize(s); return /^\d{1,4}-[A-Za-z0-9]+$/.test(s) || (/[?&]id=[^&#]+/i.test(s) && /[?&](c|client)=[^&#]+/i.test(s)); }
+
+  // ラベル → {c, id}。「27-10001」・古い ラベルの アドレス（?c=…&id=… / ?client=…&id=…）・品番だけ（いまの 得意先）
+  function parseCode(raw) {
+    var s = normalize(raw);
+    if (!s) return null;
+    var mc = s.match(/[?&](?:c|client)=([^&#]+)/i), mi = s.match(/[?&]id=([^&#]+)/i);
+    if (mc && mi) { try { return { c: decodeURIComponent(mc[1]), id: decodeURIComponent(mi[1]) }; } catch (e) { return { bad: s }; } }
+    var m = s.match(/^(\d{1,4})-([A-Za-z0-9-]+)$/);
+    if (m && (clientByNumber(m[1]) || !clients.length || m[1] === String(client.number))) return { c: m[1], id: m[2] };
+    if (/^[A-Za-z0-9-]{1,30}$/.test(s)) return { c: String(client.number), id: s };
+    return { bad: s };
+  }
+
+  function handle(raw) {
+    var p = parseCode(raw);
+    if (!p) return;
+    if (p.bad) { $("scanErr").textContent = "読めない ラベル: " + p.bad.slice(0, 60); beep(false); return; }
+    if (String(p.c) !== String(client.number)) { showWrongClient(p); beep(false); return; }
+    showItem(String(p.id));
+  }
+
+  function showWrongClient(p) {
+    seq++; current = null;
+    var other = clientByNumber(p.c);
+    var name = other ? other.number + ". " + other.name : "得意先 " + p.c;
+    var card = $("card");
+    card.className = "box card warn";
+    card.innerHTML =
+      '<div style="font-weight:700;color:var(--red);font-size:17px">ちがう 得意先の ラベル</div>' +
+      '<div style="margin:6px 0 12px">この ラベルは <b>' + esc(name) + "</b> の 品番 " + esc(p.id) + " です。<br>いまは " + esc(client.number + ". " + client.name) + "。</div>" +
+      (other ? '<button type="button" id="swBtn" style="width:100%">' + esc(name) + " に 切り替える</button>" : "");
+    flash();
+    if (other) $("swBtn").addEventListener("click", function () { setClient(other); setTimeout(function () { showItem(String(p.id)); }, 0); });
+  }
+
+  function realStock(it) { return (parseInt(it.stock, 10) || 0) - (Number(it.yoyakuQty) || 0); }
+
+  function renderItem(id, it, state, stateCls) {
+    var real = realStock(it), y = Number(it.yoyakuQty) || 0;
+    var card = $("card");
+    card.className = "box card";
+    card.innerHTML =
+      '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px">' +
+        '<span style="font-size:20px;font-weight:700">' + esc(id) + "</span>" +
+        '<span class="state ' + (stateCls || "") + '" id="cardState">' + esc(state || "") + "</span></div>" +
+      '<div style="color:var(--text-2)">' + esc(it.name || "") + "</div>" +
+      '<div class="grid2">' +
+        '<div class="tile"><div class="k">場所</div><div class="big">' + esc(it.location || "—") + "</div></div>" +
+        '<div class="tile ' + (real <= 0 ? "zero" : "ok") + '"><div class="k">在庫' + (it.nishikata ? "（" + esc(it.nishikata) + "）" : "") + '</div><div class="big">' + real + "</div></div>" +
+      "</div>" +
+      '<div class="row"><span class="k">荷姿</span><span class="v">' + esc(it.nishikata || "—") + "</span></div>" +
+      '<div class="row"><span class="k">入庫日付</span><span class="v">' + esc(it.nyukoDate || "—") + (it.nyukoQty ? "（入庫 " + esc(it.nyukoQty) + "）" : "") + "</span></div>" +
+      '<div class="row"><span class="k">予約</span><span class="v">' + (y ? esc(y) + " 予約中（在庫は 引いた 数）" : "なし") + "</span></div>" +
+      '<button type="button" id="openPage" style="width:100%;margin-top:12px">商品ページ（場所を 変える・履歴）</button>';
+    $("openPage").addEventListener("click", function () { openProductPage(id); });
+  }
+  function setState(text, cls) { var el = $("cardState"); if (el) { el.textContent = text; el.className = "state " + (cls || ""); } }
+  function flash() { var c = $("card"); c.classList.remove("flash"); void c.offsetWidth; c.classList.add("flash"); }
+
+  function showItem(id) {
+    var my = ++seq, t0 = Date.now();
+    $("scanErr").textContent = "";
+    var cached = items[id];
+    if (cached) {
+      current = { id: id, item: cached };
+      renderItem(id, cached, "確認中…", ""); flash(); beep(true);
+      addRecent(id, cached);
+    } else {
+      current = null;
+      var card = $("card"); card.className = "box card";
+      card.innerHTML = '<div style="font-size:20px;font-weight:700">' + esc(id) + '</div><div class="hint">読み込み中…</div>';
+      flash();
+    }
+    var c = client.number;
+    apiGet({ api: "item", c: c, id: id }).then(function (j) {
+      if (j.item) items[id] = j.item; else delete items[id];
+      if (my !== seq || client.number !== c) return;
+      var secs = ((Date.now() - t0) / 1000).toFixed(1) + " 秒";
+      if (!j.item) {
+        current = null;
+        var card = $("card"); card.className = "box card warn";
+        card.innerHTML = '<div style="font-size:20px;font-weight:700">' + esc(id) + '</div><div style="margin-top:6px">' +
+          esc(client.number + ". " + client.name) + " に この 品番は ありません。</div>";
+        if (cached) removeRecent(id);
+        beep(false); return;
+      }
+      var changed = cached && (String(cached.stock) !== String(j.item.stock) || cached.location !== j.item.location || Number(cached.yoyakuQty) !== Number(j.item.yoyakuQty));
+      current = { id: id, item: j.item };
+      if (cached && !changed) { setState("✓ 最新", "ok"); }
+      else { renderItem(id, j.item, changed ? "⚠ 数が 変わりました（最新）" : "✓ " + secs, changed ? "upd" : "ok"); if (!cached) { flash(); beep(true); } }
+      addRecent(id, j.item);
+    }).catch(function (e) {
+      if (my !== seq || e.auth) return;
+      if (cached) setState("最新を 確かめられません（先読みの 数）", "upd");
+      else {
+        var card = $("card"); card.className = "box card warn";
+        card.innerHTML = '<div style="font-size:20px;font-weight:700">' + esc(id) + '</div><div style="margin-top:6px">読めませんでした: ' + esc(e.message) +
+          '</div><button type="button" id="retryBtn" style="width:100%;margin-top:10px">もう一度</button>';
+        $("retryBtn").addEventListener("click", function () { showItem(id); focusScan(); });
+        beep(false);
+      }
+    });
+  }
+
+  function addRecent(id, it) {
+    recent = recent.filter(function (r) { return r.id !== id; });
+    recent.unshift({ id: id, t: Date.now(), loc: it.location || "", stock: realStock(it) });
+    recent = recent.slice(0, 8);
+    renderRecent();
+  }
+  function removeRecent(id) { recent = recent.filter(function (r) { return r.id !== id; }); renderRecent(); }
+  function renderRecent() {
+    $("recentH").textContent = recent.length ? "さっき スキャンした もの" : "";
+    $("recent").innerHTML = recent.map(function (r) {
+      return '<div class="rec" data-id="' + esc(r.id) + '"><span class="t">' + hhmm(r.t) + '</span><span class="n">' + esc(r.id) +
+        '</span><span>' + esc(r.loc || "—") + '</span><span class="s' + (r.stock <= 0 ? " zero" : "") + '">' + r.stock + "</span></div>";
+    }).join("");
+  }
+  $("recent").addEventListener("click", function (e) {
+    var r = e.target.closest(".rec"); if (!r) return;
+    showItem(r.getAttribute("data-id")); focusScan();
+  });
+
+  function openProductPage(id) {
+    var url = API + "?page=product&client=" + encodeURIComponent(client.number) + "&id=" + encodeURIComponent(id) + "&t=" + encodeURIComponent(token);
+    window.open(url, "_blank");
+  }
+
+  // ── カメラで 読む（jsQR は 使う 時だけ 読み込む）──
+  var JSQR_SRC = "https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js";
+  var JSQR_SRI = "sha384-b5Ya4Bq3qCyz39m2ISh+4DxjAIljdeFwK/BsXLuj9gugaNwAcj/ia15fxNZL9Nlx";
+  var camStream = null, camRaf = 0, jsqrLoading = null;
+  function loadJsQR() {
+    if (window.jsQR) return Promise.resolve();
+    if (jsqrLoading) return jsqrLoading;
+    jsqrLoading = new Promise(function (res, rej) {
+      var s = document.createElement("script");
+      s.src = JSQR_SRC; s.integrity = JSQR_SRI; s.crossOrigin = "anonymous";
+      s.onload = function () { res(); }; s.onerror = function () { jsqrLoading = null; rej(new Error("カメラ用の 部品を 読めませんでした")); };
+      document.head.appendChild(s);
+    });
+    return jsqrLoading;
+  }
+  $("camBtn").addEventListener("click", function () {
+    unlockAudio();
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { $("scanErr").textContent = "この ブラウザでは カメラが 使えません"; return; }
+    $("cam").classList.remove("hidden"); $("camMsg").textContent = "カメラを 開いています…";
+    Promise.all([loadJsQR(), navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false })])
+      .then(function (r) {
+        camStream = r[1];
+        var v = $("camVideo"); v.srcObject = camStream; v.play();
+        $("camMsg").textContent = "QR を 枠に 入れて ください";
+        camLoop();
+      })
+      .catch(function (e) { closeCam(); $("scanErr").textContent = "カメラを 使えません: " + (e && e.message ? e.message : e); });
+  });
+  var cv = document.createElement("canvas"), cx = cv.getContext("2d", { willReadFrequently: true });
+  function camLoop() {
+    var v = $("camVideo");
+    if (!camStream) return;
+    if (v.readyState >= 2 && v.videoWidth) {
+      var w = Math.min(640, v.videoWidth), h = Math.round(v.videoHeight * w / v.videoWidth);
+      cv.width = w; cv.height = h; cx.drawImage(v, 0, 0, w, h);
+      var code = window.jsQR(cx.getImageData(0, 0, w, h).data, w, h, { inversionAttempts: "dontInvert" });
+      if (code && code.data) { closeCam(); handle(code.data); return; }
+    }
+    camRaf = requestAnimationFrame(camLoop);
+  }
+  function closeCam() {
+    cancelAnimationFrame(camRaf);
+    if (camStream) { camStream.getTracks().forEach(function (t) { t.stop(); }); camStream = null; }
+    $("camVideo").srcObject = null;
+    $("cam").classList.add("hidden");
+  }
+  $("camClose").addEventListener("click", function () { closeCam(); });
+  document.addEventListener("visibilitychange", function () { if (document.hidden) closeCam(); });
+
+  // ── はじめ ──
+  if (!API) show("vSetup");
+  else if (!token) showLogin("");
+  else if (!client || !client.number) startPick(false);
+  else startMain();
+})();
+</script>
+</body>
+</html>
