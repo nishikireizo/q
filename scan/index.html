@@ -516,29 +516,53 @@
   }
   // 📷 = 開く / 閉じる。開いている 間は 読むたびに 結果を 出して そのまま 次の ラベルを 待つ（連続）。
   // 同じ ラベルは 2.5 秒 続けて 読まない（枠に 入った まま でも 1回だけ）。読んだ あと 0.8 秒 休む。
-  var camOpening = false, camPauseUntil = 0, lastCode = "", lastCodeAt = 0, hitTimer = null;
+  // カメラの 許可: iPhone は カメラを 止める（stop）と、次に 開く 時 また 許可を 聞く。
+  // なので 1回 もらった カメラは 止めない。閉じる 時は 隠して 休ませる だけ（track.enabled = false）。
+  // 次に 開く 時は 同じ カメラを 使う → 許可を 聞かない。iPhone が カメラを 終わらせた 時だけ もう一度 聞く。
+  var camOpening = false, camPauseUntil = 0, lastCode = "", lastCodeAt = 0, hitTimer = null, camWasOpen = false;
+  function camLive() {
+    var t = camStream && camStream.getVideoTracks()[0];
+    return !!(t && t.readyState === "live");
+  }
+  function camShown() { return !$("cam").classList.contains("hidden"); }
   $("camBtn").addEventListener("click", function () {
     unlockAudio();
-    if (camStream || camOpening) { closeCam(); return; }
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { $("scanErr").textContent = "この ブラウザでは カメラが 使えません"; return; }
-    camOpening = true;
-    $("cam").classList.remove("hidden"); $("camBtn").classList.add("on"); $("camMsg").textContent = "カメラを 開いています…";
+    if (camShown()) { closeCam(); return; }
+    openCam();
+  });
+  function openCam() {
+    $("cam").classList.remove("hidden"); $("camBtn").classList.add("on");
+    if (camLive()) { startCam(); return; }   // もう 許可が ある カメラ — 聞かない
+    if (camOpening) return;
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { closeCam(); $("scanErr").textContent = "この ブラウザでは カメラが 使えません"; return; }
+    camOpening = true; dropCam();
+    $("camMsg").textContent = "カメラを 開いています…";
     Promise.all([loadJsQR(), navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false })])
       .then(function (r) {
         camOpening = false;
-        if ($("cam").classList.contains("hidden")) { r[1].getTracks().forEach(function (t) { t.stop(); }); return; }   // 開く 前に 閉じた
         camStream = r[1];
-        var v = $("camVideo"); v.srcObject = camStream; v.play();
-        $("camMsg").textContent = "QR を 枠に 入れて ください（続けて 読めます）";
-        lastCode = ""; camPauseUntil = 0;
-        camLoop();
+        if (camShown()) startCam(); else restTracks();   // 開く 前に 閉じた → 止めずに 取っておく
       })
       .catch(function (e) { camOpening = false; closeCam(); $("scanErr").textContent = "カメラを 使えません: " + (e && e.message ? e.message : e); });
-  });
+  }
+  function startCam() {
+    camStream.getVideoTracks().forEach(function (t) { t.enabled = true; });
+    var v = $("camVideo");
+    if (v.srcObject !== camStream) v.srcObject = camStream;
+    var pr = v.play(); if (pr && pr.catch) pr.catch(function () {});
+    $("camMsg").textContent = "QR を 枠に 入れて ください（続けて 読めます）";
+    lastCode = ""; camPauseUntil = 0;
+    cancelAnimationFrame(camRaf); camLoop();
+  }
+  function restTracks() { if (camStream) camStream.getVideoTracks().forEach(function (t) { t.enabled = false; }); }
+  function dropCam() {   // 本当に 止める（iPhone が 終わらせた カメラを 片付ける 時だけ）
+    if (camStream) { camStream.getTracks().forEach(function (t) { t.stop(); }); camStream = null; }
+    $("camVideo").srcObject = null;
+  }
   var cv = document.createElement("canvas"), cx = cv.getContext("2d", { willReadFrequently: true });
   function camLoop() {
     var v = $("camVideo");
-    if (!camStream) return;
+    if (!camStream || !camShown()) return;
     var now = Date.now();
     if (now >= camPauseUntil && v.readyState >= 2 && v.videoWidth) {
       var w = Math.min(640, v.videoWidth), h = Math.round(v.videoHeight * w / v.videoWidth);
@@ -557,15 +581,19 @@
     }
     camRaf = requestAnimationFrame(camLoop);
   }
-  function closeCam() {
+  function closeCam() {   // 隠す だけ — カメラは 止めない（次に 開く 時 許可を 聞かない）
     cancelAnimationFrame(camRaf);
-    if (camStream) { camStream.getTracks().forEach(function (t) { t.stop(); }); camStream = null; }
-    $("camVideo").srcObject = null;
+    restTracks();
+    try { $("camVideo").pause(); } catch (e) {}
     $("cam").classList.add("hidden"); $("cam").classList.remove("hit");
     $("camBtn").classList.remove("on");
   }
   $("camClose").addEventListener("click", function () { closeCam(); });
-  document.addEventListener("visibilitychange", function () { if (document.hidden) closeCam(); });
+  // ほかの アプリに 行って 戻った 時: カメラが まだ 生きていれば そのまま 開き直す（許可は 聞かない）
+  document.addEventListener("visibilitychange", function () {
+    if (document.hidden) { camWasOpen = camShown(); if (camWasOpen) closeCam(); }
+    else if (camWasOpen) { camWasOpen = false; if (camLive()) openCam(); }
+  });
 
   // ── はじめ ──
   if (!API) show("vSetup");
