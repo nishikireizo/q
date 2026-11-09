@@ -97,12 +97,17 @@
   .hint { text-align: center; color: var(--text-2); padding: 26px 10px; font-size: 14px; }
   .foot { text-align: center; padding: 18px 16px 0; }
   .link { background: none; border: 0; color: var(--text-2); font-size: 13px; text-decoration: underline; padding: 4px; }
-  .cam { position: fixed; inset: 0; background: #000; z-index: 50; display: flex; flex-direction: column; }
-  .cam video { flex: 1; width: 100%; object-fit: cover; min-height: 0; }
-  .cam .frame { position: absolute; left: 50%; top: 45%; width: 62vw; height: 62vw; max-width: 300px; max-height: 300px;
-                transform: translate(-50%, -50%); border: 3px solid rgba(255,255,255,0.85); border-radius: 18px; }
-  .cam .camfoot { padding: 14px 16px 26px; display: flex; justify-content: space-between; align-items: center; color: #fff; font-size: 14px; }
-  .cam .camfoot button { background: #fff; }
+  /* カメラは 画面の 上に 開いた まま（連続 スキャン）— 下の カードで 結果が 見える */
+  .cam { position: relative; margin: 0 16px 12px; height: 38vh; min-height: 220px; max-height: 340px;
+         background: #000; border-radius: 14px; overflow: hidden; }
+  .cam video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .cam .frame { position: absolute; left: 50%; top: 45%; width: 58%; aspect-ratio: 1; max-height: 78%;
+                transform: translate(-50%, -50%); border: 3px solid rgba(255,255,255,0.85); border-radius: 16px;
+                transition: border-color 0.15s, box-shadow 0.15s; }
+  .cam.hit .frame { border-color: #22c55e; box-shadow: 0 0 0 4px rgba(34,197,94,0.35); }
+  .cam .camfoot { position: absolute; left: 0; right: 0; bottom: 0; padding: 8px 10px; display: flex; justify-content: space-between;
+                  align-items: center; gap: 8px; color: #fff; font-size: 13px; background: rgba(0,0,0,0.45); }
+  .cam .camfoot button { background: #fff; padding: 6px 12px; flex: none; }
 </style>
 </head>
 <body>
@@ -157,6 +162,12 @@
       </div>
       <div class="msg err" id="scanErr"></div>
     </div>
+    <!-- カメラ（📷 で 開く・閉じるまで 開いた まま）-->
+    <div class="cam hidden" id="cam">
+      <video id="camVideo" playsinline muted autoplay></video>
+      <div class="frame"></div>
+      <div class="camfoot"><span id="camMsg">QR を 枠に 入れて ください</span><button type="button" id="camClose">閉じる</button></div>
+    </div>
     <div class="box card" id="card"></div>
     <div class="recent-h" id="recentH"></div>
     <div id="recent"></div>
@@ -164,12 +175,6 @@
   </div>
 </div>
 
-<!-- カメラ -->
-<div class="cam hidden" id="cam">
-  <video id="camVideo" playsinline muted autoplay></video>
-  <div class="frame"></div>
-  <div class="camfoot"><span id="camMsg">QR を 枠に 入れて ください</span><button type="button" id="camClose">閉じる</button></div>
-</div>
 
 <script>
 (function () {
@@ -509,28 +514,46 @@
     });
     return jsqrLoading;
   }
+  // 📷 = 開く / 閉じる。開いている 間は 読むたびに 結果を 出して そのまま 次の ラベルを 待つ（連続）。
+  // 同じ ラベルは 2.5 秒 続けて 読まない（枠に 入った まま でも 1回だけ）。読んだ あと 0.8 秒 休む。
+  var camOpening = false, camPauseUntil = 0, lastCode = "", lastCodeAt = 0, hitTimer = null;
   $("camBtn").addEventListener("click", function () {
     unlockAudio();
+    if (camStream || camOpening) { closeCam(); return; }
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { $("scanErr").textContent = "この ブラウザでは カメラが 使えません"; return; }
-    $("cam").classList.remove("hidden"); $("camMsg").textContent = "カメラを 開いています…";
+    camOpening = true;
+    $("cam").classList.remove("hidden"); $("camBtn").classList.add("on"); $("camMsg").textContent = "カメラを 開いています…";
     Promise.all([loadJsQR(), navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false })])
       .then(function (r) {
+        camOpening = false;
+        if ($("cam").classList.contains("hidden")) { r[1].getTracks().forEach(function (t) { t.stop(); }); return; }   // 開く 前に 閉じた
         camStream = r[1];
         var v = $("camVideo"); v.srcObject = camStream; v.play();
-        $("camMsg").textContent = "QR を 枠に 入れて ください";
+        $("camMsg").textContent = "QR を 枠に 入れて ください（続けて 読めます）";
+        lastCode = ""; camPauseUntil = 0;
         camLoop();
       })
-      .catch(function (e) { closeCam(); $("scanErr").textContent = "カメラを 使えません: " + (e && e.message ? e.message : e); });
+      .catch(function (e) { camOpening = false; closeCam(); $("scanErr").textContent = "カメラを 使えません: " + (e && e.message ? e.message : e); });
   });
   var cv = document.createElement("canvas"), cx = cv.getContext("2d", { willReadFrequently: true });
   function camLoop() {
     var v = $("camVideo");
     if (!camStream) return;
-    if (v.readyState >= 2 && v.videoWidth) {
+    var now = Date.now();
+    if (now >= camPauseUntil && v.readyState >= 2 && v.videoWidth) {
       var w = Math.min(640, v.videoWidth), h = Math.round(v.videoHeight * w / v.videoWidth);
       cv.width = w; cv.height = h; cx.drawImage(v, 0, 0, w, h);
       var code = window.jsQR(cx.getImageData(0, 0, w, h).data, w, h, { inversionAttempts: "dontInvert" });
-      if (code && code.data) { closeCam(); handle(code.data); return; }
+      if (code && code.data && !(code.data === lastCode && now - lastCodeAt < 2500)) {
+        lastCode = code.data; lastCodeAt = now; camPauseUntil = now + 800;
+        var cam = $("cam"); cam.classList.add("hit"); clearTimeout(hitTimer);
+        hitTimer = setTimeout(function () { cam.classList.remove("hit"); }, 600);
+        var p = parseCode(code.data);
+        $("camMsg").textContent = "読みました: " + (p && !p.bad ? p.c + "-" + p.id : normalize(code.data).slice(0, 24)) + " — 次の ラベルへ";
+        handle(code.data);
+      } else if (code && code.data === lastCode) {
+        lastCodeAt = now;   // 同じ ラベルが 枠に ある 間は 読まない
+      }
     }
     camRaf = requestAnimationFrame(camLoop);
   }
@@ -538,7 +561,8 @@
     cancelAnimationFrame(camRaf);
     if (camStream) { camStream.getTracks().forEach(function (t) { t.stop(); }); camStream = null; }
     $("camVideo").srcObject = null;
-    $("cam").classList.add("hidden");
+    $("cam").classList.add("hidden"); $("cam").classList.remove("hit");
+    $("camBtn").classList.remove("on");
   }
   $("camClose").addEventListener("click", function () { closeCam(); });
   document.addEventListener("visibilitychange", function () { if (document.hidden) closeCam(); });
