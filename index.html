@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<meta name="referrer" content="no-referrer">
+<title>ニシキ冷蔵</title>
+<style>
+  body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center;
+         background: #d7edfb; color: #23403a; font-family: "Hiragino Sans", "Noto Sans JP", sans-serif; }
+  .box { text-align: center; padding: 24px 16px; }
+  .msg { font-size: 17px; font-weight: 700; margin: 12px 0 4px; }
+  .sub { font-size: 13px; color: #4f6d66; }
+  .spin { width: 28px; height: 28px; border: 3px solid #b9dcd2; border-top-color: #2f6b57; border-radius: 50%;
+          margin: 0 auto; animation: s 0.8s linear infinite; }
+  @keyframes s { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<div class="box">
+  <div class="spin" id="spin"></div>
+  <div class="msg" id="msg">開いています…</div>
+  <div class="sub" id="sub">ニシキ冷蔵 商品詳細</div>
+</div>
+<script>
+(function () {
+  var KEY = "nishiki_qr_token";
+  var q = new URLSearchParams(location.search);
+  var h = new URLSearchParams(location.hash.slice(1));
+  var d = q.get("d") || "", c = q.get("c") || "", id = q.get("id") || "";
+
+  function fail(text) {
+    document.getElementById("spin").style.display = "none";
+    document.getElementById("msg").textContent = text;
+    document.getElementById("sub").textContent = "QR を もう一度 読んで ください";
+  }
+
+  // 登録: 商品詳細の「登録」ボタンから #t=… で 来る — この 端末に 覚える
+  var t = h.get("t");
+  if (t) {
+    try { localStorage.setItem(KEY, t); } catch (e) {}
+    history.replaceState(null, "", location.pathname + location.search);
+  }
+
+  // 決まった 形 だけ 通す（ほかの サイトへは 飛ばない）
+  if (!/^AKfycb[A-Za-z0-9_-]{20,120}$/.test(d) || !/^\d{1,4}$/.test(c) || !/^[A-Za-z0-9-]{1,20}$/.test(id)) {
+    fail("この QR は 読めません");
+    return;
+  }
+  var token = "";
+  try { token = localStorage.getItem(KEY) || ""; } catch (e) {}
+  if (!/^[a-f0-9]{20,80}$/.test(token)) token = "";
+
+  var url = "https://script.google.com/macros/s/" + d + "/exec?page=product&client=" + encodeURIComponent(c) +
+            "&id=" + encodeURIComponent(id) + (token ? "&t=" + encodeURIComponent(token) : "");
+  location.replace(url);
+})();
+</script>
+</body>
+</html>
