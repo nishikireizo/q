@@ -326,7 +326,7 @@
     var L = lists[c];
     if (L.loading) return;
     L.loading = true; renderHeader();
-    apiGet({ api: "list", c: c }).then(function (j) {
+    apiGet({ api: "list", client: c }).then(function (j) {
       setItems(c, j.items, j.at);
       lsSet(K.list + c, JSON.stringify({ at: j.at || Date.now(), items: j.items || [] }));
     }).catch(function (e) {
@@ -450,7 +450,7 @@
       renderMsgCard(c, id, '<div class="hint">読み込み中…</div>', false, changedClient);
       flash();
     }
-    apiGet({ api: "item", c: c, id: id }).then(function (j) {
+    apiGet({ api: "item", client: c, id: id }).then(function (j) {
       if (j.item) lists[c].items[id] = j.item; else delete lists[c].items[id];
       if (my !== seq) return;
       var secs = ((Date.now() - t0) / 1000).toFixed(1) + " 秒";
