@@ -13,6 +13,9 @@
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon-180.png">
 <title>スキャン</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 <!--
   ニシキ冷蔵 — スキャン画面（ピッキング用・iPhone の ホーム画面に 追加して 使う）
   ・ラベルの QR「27-10001」（得意先-品番）を Bluetooth スキャナー か カメラで 読む。古い ラベル（アドレス）も 読める。
@@ -25,16 +28,18 @@
 <style>
   :root {
     color-scheme: light;
-    --bg: #f0f2f5; --surface: #ffffff; --surface-2: #f7f8fa; --border: #dde1e9;
-    --text: #1a1d27; --text-2: #6b7280; --muted: #9ca3af;
-    --accent: #2563eb; --accent-bg: #eff6ff; --accent-mid: #bfdbfe;
-    --green: #15803d; --green-bg: #f0fdf4; --green-border: #bbf7d0;
-    --amber: #b45309; --amber-bg: #fffbeb; --amber-border: #fde68a;
-    --red: #b91c1c; --red-bg: #fef2f2; --red-border: #fecaca;
+    /* 色と形 — 商品ページ（product.html）と 同じ: 空色の 背景・深い 緑青・からし */
+    --bg: #d7edfb; --surface: #ffffff; --surface-2: #f1f8fc; --border: #cfe3ec;
+    --text: #23403a; --text-2: #4f6d66; --muted: #6e8a84;
+    --accent: #2f6b57; --accent-bg: #e5f2ee; --accent-mid: #b9dcd2;
+    --green: #2f6b57; --green-bg: #e5f2ee; --green-border: #b9dcd2;
+    --amber: #7a5a00; --amber-bg: #fbf1d4; --amber-border: #e0b038;
+    --red: #a9563f; --red-bg: #f9ebe5; --red-border: #e6b8a8;
+    --brown: #a88068; --radius: 18px; --mono: "DM Mono", ui-monospace, Menlo, monospace;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; background: var(--bg); color: var(--text); }
-  body { font-family: -apple-system, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", system-ui, sans-serif;
+  body { font-family: "Noto Sans JP", -apple-system, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", system-ui, sans-serif;
          font-size: 15px; line-height: 1.5; min-height: 100vh; }
   .wrap { max-width: 520px; margin: 0 auto; padding: 0 0 32px; }
   .hidden { display: none !important; }
@@ -46,8 +51,10 @@
     font: inherit; font-size: 16px; width: 100%; height: 46px; padding: 0 12px; color: var(--text);
     background: var(--surface); border: 1px solid var(--border); border-radius: 10px; outline: none; }
   input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-mid); }
-  .bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 16px;
-         background: var(--surface); border-bottom: 1px solid var(--border); }
+  .bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 16px; margin: 10px 12px 0;
+         background: var(--surface); border: 1px solid var(--border); border-radius: 14px; }
+  .bar + .bar { margin-top: 8px; }
+  .title { color: var(--accent); }
   .title { font-size: 18px; font-weight: 700; }
   .sub { font-size: 12px; color: var(--text-2); }
   .pill { font-size: 12px; padding: 4px 10px; border-radius: 999px; white-space: nowrap; border: 1px solid transparent; }
@@ -71,7 +78,7 @@
   .scanrow input { flex: 1; min-width: 0; font-size: 17px; border-width: 2px; }
   .iconbtn { width: 50px; flex: none; padding: 0; font-size: 20px; }
   .iconbtn.on { background: var(--accent-bg); border-color: var(--accent); }
-  .card { margin: 0 16px 14px; }
+  .card { margin: 0 12px 14px; border-radius: var(--radius); }
   .card.flash { animation: fl 0.5s ease-out; }
   @keyframes fl { from { box-shadow: 0 0 0 4px var(--accent-mid); } to { box-shadow: 0 0 0 0 transparent; } }
   .card.warn { background: var(--red-bg); border-color: var(--red-border); }
@@ -108,6 +115,90 @@
   .cam .camfoot { position: absolute; left: 0; right: 0; bottom: 0; padding: 8px 10px; display: flex; justify-content: space-between;
                   align-items: center; gap: 8px; color: #fff; font-size: 13px; background: rgba(0,0,0,0.45); }
   .cam .camfoot button { background: #fff; padding: 6px 12px; flex: none; }
+  /* ══ 商品カード — 商品ページ（product.html）と 同じ 形 ══ */
+  .hero { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px 12px;
+          box-shadow: 0 4px 14px rgba(35,64,58,.08); margin-bottom: 10px; }
+  .hero.warn { background: var(--red-bg); border-color: var(--red-border); }
+  .hero-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 12px; }
+  .hero-eyebrow { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 10px; letter-spacing: 3px;
+                  color: var(--muted); margin-bottom: 4px; }
+  .hero-eyebrow .state { letter-spacing: 0; font-size: 11px; }
+  .hero-client { font-size: 13px; font-weight: 700; color: var(--text-2); margin-bottom: 4px; }
+  .chg-tag { display: inline-block; font-size: 11px; font-weight: 700; color: var(--amber); background: var(--amber-bg);
+             border: 1px solid var(--amber-border); border-radius: 999px; padding: 0 8px; margin-left: 4px; }
+  .hero-number { font: 500 30px var(--mono); color: var(--accent); letter-spacing: 1px; line-height: 1.05; margin-bottom: 6px; word-break: break-all; }
+  .hero-name { font-size: 15px; font-weight: 700; line-height: 1.5; }
+  .stock-pill { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; min-width: 86px; padding: 10px 14px;
+                background: var(--accent-bg); border: 1px solid var(--accent-mid); border-radius: 14px; }
+  .stock-pill.low { background: var(--amber-bg); border-color: var(--amber-border); }
+  .stock-pill.zero { background: var(--red-bg); border-color: var(--red-border); }
+  .stock-num { font: 700 30px var(--mono); color: var(--accent); line-height: 1; }
+  .stock-pill.low .stock-num { color: var(--amber); }
+  .stock-pill.zero .stock-num { color: var(--red); }
+  .stock-label { font-size: 10px; font-weight: 700; letter-spacing: 1px; color: var(--muted); margin-top: 4px; }
+  .tab-nav { display: flex; gap: 3px; padding: 3px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); }
+  .tab-btn { flex: 1; border: none; border-radius: 9px; padding: 8px 4px; font-size: 13px; font-weight: 700; color: var(--text-2); background: none; }
+  .tab-btn.active { background: #fff; color: var(--accent); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+  .tab-n { display: inline-block; min-width: 18px; margin-left: 4px; padding: 0 5px; border-radius: 999px; background: var(--accent-bg);
+           color: var(--accent); font: 700 11px var(--mono); line-height: 17px; }
+  .tab-n:empty { display: none; }
+  .pane { display: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 4px 14px 14px;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+  .pane.active { display: block; }
+  .sec-head { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; color: var(--accent); letter-spacing: 1px; margin: 14px 0 8px; }
+  .sec-head::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+  .info-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+  .info-cell { background: var(--surface-2); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; min-width: 0; }
+  .info-cell.full { grid-column: 1 / -1; }
+  .info-key { font-size: 11px; font-weight: 700; letter-spacing: .5px; color: var(--muted); margin-bottom: 4px; }
+  .info-val { font-size: 15px; font-weight: 500; word-break: break-all; }
+  .info-cell.loc { background: var(--accent-bg); border-color: var(--accent-mid); }
+  .info-cell.loc .info-val { font: 700 30px var(--mono); color: var(--accent); line-height: 1.15; }
+  .info-cell.loc .info-val.empty { font-size: 15px; font-weight: 500; font-family: inherit; color: var(--amber); }
+  .yoyaku { display: flex; justify-content: space-between; align-items: center; gap: 10px; background: var(--amber-bg); border: 1px solid var(--amber-border);
+            border-radius: 10px; padding: 10px 14px; }
+  .yoyaku .yk { font-size: 10px; letter-spacing: 1.5px; color: var(--amber); margin-bottom: 2px; }
+  .yoyaku .yn { font: 700 18px var(--mono); color: var(--amber); }
+  .empty-msg { text-align: center; color: var(--muted); font-size: 13px; padding: 18px 0; }
+  .pane-foot { display: flex; justify-content: space-between; gap: 8px; margin-top: 12px; }
+  .refresh-btn { border-radius: 10px; border: 1px solid var(--accent-mid); background: #fff; color: var(--accent); font-size: 12px; font-weight: 700; padding: 7px 12px; }
+  .updated-ts { font: 10px var(--mono); color: var(--muted); text-align: center; margin-top: 12px; }
+  .loc-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; background: var(--surface-2); border: 1px solid var(--border);
+             border-radius: 12px; padding: 10px 14px; margin-bottom: 6px; }
+  .loc-row.current { background: var(--accent-bg); border-color: var(--accent-mid); }
+  .loc-name { font: 500 15px var(--mono); white-space: pre-line; word-break: break-all; }
+  .loc-row.current .loc-name.big { font-size: 26px; font-weight: 700; color: var(--accent); }
+  .loc-date { font-size: 11px; color: var(--muted); }
+  .loc-edit-btn { flex: none; border-radius: 10px; border: 1px solid var(--accent-mid); background: #fff; font-size: 13px; font-weight: 700; padding: 7px 10px; }
+  .badge { font-size: 10px; padding: 2px 8px; border-radius: 20px; font-weight: 700; }
+  .badge-blue { background: var(--accent-bg); color: var(--accent); border: 1px solid var(--accent-mid); }
+  .badge-move { background: var(--accent); color: #fff; border: 1px solid var(--accent); }
+  /* 記録 — 商品ページの 表と 同じ 中身を スマホの 幅で（横に 動かさない）: 日付 | 内容（引取先・運送・担当・伝票）| 数・残り */
+  .kv-h, .kv { display: grid; grid-template-columns: 62px minmax(0, 1fr) auto; gap: 8px; align-items: start; }
+  .kv-h { font-size: 11px; font-weight: 700; color: var(--muted); padding: 0 2px 5px; border-bottom: 1px solid var(--border); }
+  .kv-h span:last-child { text-align: right; }
+  .kv { padding: 8px 2px; border-bottom: 1px solid #edf3f6; font-size: 13px; font-weight: 500; }
+  .kv:last-child { border-bottom: 0; }
+  .kv-d { font: 500 12px var(--mono); color: var(--text-2); line-height: 1.35; }
+  .kv-d span { display: block; color: var(--muted); font-size: 11px; }
+  .kv-k { line-height: 1.45; word-break: break-word; }
+  .kv-k b { font-family: var(--mono); }
+  .kv-sub { font-size: 11px; color: var(--muted); margin-top: 2px; word-break: break-word; }
+  .kv-n { text-align: right; font-family: var(--mono); white-space: nowrap; line-height: 1.35; }
+  .kv-n .kv-q { display: block; font-size: 14px; font-weight: 500; }
+  .kv-n .kv-left { display: block; font-size: 11px; color: var(--muted); }
+  .kv.cx .kv-d, .kv.cx .kv-k, .kv.cx .kv-n { color: var(--muted); text-decoration: line-through; }
+  .kv.cx .kr-tag { text-decoration: none; }
+  .k-in { color: var(--accent); font-weight: 700; }
+  .k-out { color: var(--text); font-weight: 700; }
+  .k-kp { color: var(--brown); font-weight: 700; }
+  .k-move { color: var(--accent); font-weight: 700; }
+  .k-loc { color: var(--brown); font-weight: 500; }
+  .k-fix { color: var(--red); font-weight: 700; }
+  .kr-tag { display: inline-block; font-size: 10.5px; font-weight: 700; border-radius: 5px; padding: 0 6px; background: #eef1f4; color: var(--muted); }
+  .kr-tag.yy { background: var(--amber-bg); color: var(--amber); }
+  .ver { font: 10px var(--mono); color: var(--muted); margin-top: 6px; }
+  @media (max-width: 360px) { .hero-number, .stock-num { font-size: 24px; } }
 </style>
 </head>
 <body>
@@ -171,7 +262,7 @@
     <div class="box card" id="card"></div>
     <div class="recent-h" id="recentH"></div>
     <div id="recent"></div>
-    <div class="foot"><button type="button" class="link" id="logoutBtn">この 端末の ログインを やめる</button></div>
+    <div class="foot"><button type="button" class="link" id="logoutBtn">この 端末の ログインを やめる</button><div class="ver" id="verLbl"></div></div>
   </div>
 </div>
 
@@ -407,36 +498,155 @@
 
   function realStock(it) { return (parseInt(it.stock, 10) || 0) - (Number(it.yoyakuQty) || 0); }
 
-  function renderItem(c, id, it, state, stateCls, changedClient) {
-    var real = realStock(it), y = Number(it.yoyakuQty) || 0;
-    var card = $("card");
-    card.className = "box card";
-    card.innerHTML =
-      '<div class="cl' + (changedClient ? " chg" : "") + '">' + esc(clientLabel(c)) + (changedClient ? "　← 得意先が 変わりました" : "") + "</div>" +
-      '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px">' +
-        '<span style="font-size:20px;font-weight:700">' + esc(id) + "</span>" +
-        '<span class="state ' + (stateCls || "") + '" id="cardState">' + esc(state || "") + "</span></div>" +
-      '<div style="color:var(--text-2)">' + esc(it.name || "") + "</div>" +
-      '<div class="grid2">' +
-        '<div class="tile"><div class="k">場所</div><div class="big">' + esc(it.location || "—") + "</div></div>" +
-        '<div class="tile ' + (real <= 0 ? "zero" : "ok") + '"><div class="k">在庫' + (it.nishikata ? "（" + esc(it.nishikata) + "）" : "") + '</div><div class="big">' + real + "</div></div>" +
+  // ══ 商品カード — 商品ページ（product.html）と 同じ 形 ══
+  //  上の 箱: 得意先・品番（— メモ）・商品名・在庫数。タブ: 基本情報 / 記録 / 場所（ラベル・場所の 変更は 商品ページで）。
+  //  場所は ピッキングで 一番 見る ので 基本情報の 一番 上に 大きく。
+  //  記録（api=kiroku）は 品物と 同時に 読む。読んだ 記録は この アプリが 開いている 間 覚える（同じ 品物は すぐ 出る）。
+  var tab = "info", kiroku = {}, cardItem = null;
+  var TABS = [["info", "基本情報"], ["kiroku", "記録"], ["location", "場所"]];
+  function inDay(s) {   // 商品ページと 同じ 日付の 形（26/10/28）
+    var m = String(s == null ? "" : s).trim().match(/^(\d{4})\s*[\/\-.年]\s*(\d{1,2})\s*[\/\-.月]\s*(\d{1,2})/);
+    return m ? [m[1].slice(2), ("0" + m[2]).slice(-2), ("0" + m[3]).slice(-2)].join("/") : String(s == null ? "" : s);
+  }
+  function stamp(t) { var d = new Date(t); return d.getFullYear() + "/" + ("0" + (d.getMonth() + 1)).slice(-2) + "/" + ("0" + d.getDate()).slice(-2) + " " + hhmm(t); }
+  function heroHtml(c, id, it, state, stateCls, chg, warn) {
+    var real = it ? realStock(it) : null;
+    var pc = real == null ? "" : real <= 0 ? " zero" : real <= 10 ? " low" : "";
+    return '<div class="hero' + (warn ? " warn" : "") + '"><div class="hero-top"><div style="flex:1;min-width:0">' +
+        '<div class="hero-eyebrow"><span>ニシキ冷蔵株式会社</span><span class="state ' + (stateCls || "") + '" id="cardState">' + esc(state || "") + "</span></div>" +
+        '<div class="hero-client">' + esc(clientLabel(c)) + (chg ? '<span class="chg-tag">← 得意先が 変わりました</span>' : "") + "</div>" +
+        '<div class="hero-number">' + esc(id + (it && it.note ? " — " + it.note : "")) + "</div>" +
+        '<div class="hero-name">' + esc(it ? it.name || "" : "") + "</div>" +
       "</div>" +
-      '<div class="row"><span class="k">荷姿</span><span class="v">' + esc(it.nishikata || "—") + "</span></div>" +
-      '<div class="row"><span class="k">入庫日付</span><span class="v">' + esc(it.nyukoDate || "—") + (it.nyukoQty ? "（入庫 " + esc(it.nyukoQty) + "）" : "") + "</span></div>" +
-      '<div class="row"><span class="k">予約</span><span class="v">' + (y ? esc(y) + " 予約中（在庫は 引いた 数）" : "なし") + "</span></div>" +
-      '<button type="button" id="openPage" style="width:100%;margin-top:12px">商品ページ（場所を 変える・履歴）</button>';
-    $("openPage").addEventListener("click", function () { openProductPage(c, id); });
+      (real == null ? "" : '<div class="stock-pill' + pc + '"><div class="stock-num">' + real + '</div><div class="stock-label">在庫数</div></div>') +
+      "</div>" +
+      (it ? '<div class="tab-nav">' + TABS.map(function (t) {
+        return '<button type="button" class="tab-btn' + (t[0] === tab ? " active" : "") + '" data-tab="' + t[0] + '">' + t[1] +
+          (t[0] === "kiroku" ? '<span class="tab-n" id="kirokuN"></span>' : "") + "</button>";
+      }).join("") + "</div>" : "");
+  }
+  function renderItem(c, id, it, state, stateCls, changedClient) {
+    var real = realStock(it), y = Number(it.yoyakuQty) || 0, card = $("card");
+    cardItem = it;
+    card.className = "card"; card.setAttribute("data-c", c); card.setAttribute("data-id", id);
+    var cell = function (k, v) { return '<div class="info-cell"><div class="info-key">' + k + '</div><div class="info-val">' + esc(v === "" || v == null ? "—" : v) + "</div></div>"; };
+    card.innerHTML = heroHtml(c, id, it, state, stateCls, changedClient) + "</div>" +
+      '<div class="pane' + (tab === "info" ? " active" : "") + '" data-pane="info">' +
+        '<div class="sec-head">基本情報</div><div class="info-grid">' +
+          '<div class="info-cell full loc"><div class="info-key">場所</div><div class="info-val' + (it.location ? "" : " empty") + '">' + esc(it.location || "場所が ありません") + "</div></div>" +
+          cell("入庫日付", inDay(it.nyukoDate)) + cell("入庫元数", it.nyukoQty) +
+          cell("現在在庫", real + (it.nishikata ? " " + it.nishikata : "")) + cell("荷姿", it.nishikata) +
+        "</div>" +
+        '<div class="sec-head">予約状況</div>' +
+        (y > 0 ? '<div class="yoyaku"><div><div class="yk">予約あり</div><div class="yn">×' + esc(y) + '</div></div><div class="sub">出庫予定数（在庫数は 引いた 数）</div></div>'
+               : '<div class="empty-msg">予約なし</div>') +
+        '<div class="pane-foot"><button type="button" class="refresh-btn" id="refreshBtn">↻ データ更新</button>' +
+          '<button type="button" class="refresh-btn" id="openPage">商品ページ ↗</button></div>' +
+        '<div class="updated-ts">最終更新: ' + stamp(Date.now()) + "</div>" +
+      "</div>" +
+      '<div class="pane' + (tab === "kiroku" ? " active" : "") + '" data-pane="kiroku"><div class="sec-head">記録</div><div id="kirokuArea"></div></div>' +
+      '<div class="pane' + (tab === "location" ? " active" : "") + '" data-pane="location"><div class="sec-head">現在の場所</div>' +
+        (it.location
+          ? '<div class="loc-row current"><div style="min-width:0"><div class="loc-date">現在地</div><div class="loc-name big">' + esc(it.location) + '</div></div><button type="button" class="loc-edit-btn" id="locEdit">✏️ 場所変更</button></div>'
+          : '<div class="loc-row"><div class="empty-msg" style="padding:0">場所情報なし</div><button type="button" class="loc-edit-btn" id="locEdit">✏️ 場所設定</button></div>') +
+        '<div class="sec-head">場所の記録（部屋移動・場所の変更）</div><div id="locHist"></div>' +
+      "</div>";
+    paintKiroku(c + "-" + id);
   }
   function renderMsgCard(c, id, html, warn, chg) {
     var card = $("card");
-    card.className = "box card" + (warn ? " warn" : "");
-    card.innerHTML = '<div class="cl' + (chg ? " chg" : "") + '">' + esc(clientLabel(c)) + (chg ? "　← 得意先が 変わりました" : "") + '</div><div style="font-size:20px;font-weight:700">' + esc(id) + "</div>" + html;
+    cardItem = null;
+    card.className = "card"; card.setAttribute("data-c", c); card.setAttribute("data-id", id);
+    card.innerHTML = heroHtml(c, id, null, "", "", chg, warn) + html + "</div>";
+  }
+  function setTab(t) {
+    tab = t;
+    var card = $("card");
+    Array.prototype.forEach.call(card.querySelectorAll("[data-tab]"), function (b) { b.classList.toggle("active", b.getAttribute("data-tab") === t); });
+    Array.prototype.forEach.call(card.querySelectorAll("[data-pane]"), function (p) { p.classList.toggle("active", p.getAttribute("data-pane") === t); });
+  }
+  $("card").addEventListener("click", function (e) {
+    var b = e.target.closest("button"), card = $("card"); if (!b) return;
+    var c = card.getAttribute("data-c"), id = card.getAttribute("data-id");
+    if (b.hasAttribute("data-tab")) setTab(b.getAttribute("data-tab"));
+    else if (b.id === "openPage" || b.id === "locEdit") openProductPage(c, id);
+    else if (b.id === "refreshBtn") showItem(c, id, true);
+    else return;
+    focusScan();
+  });
+
+  function loadKiroku(c, id) {
+    var key = c + "-" + id, k = kiroku[key] || (kiroku[key] = {});
+    k.err = "";
+    apiGet({ api: "kiroku", client: c, id: id }).then(function (j) {
+      k.d = j.kiroku || { entry: null, out: [], edit: [], loc: [] }; k.at = Date.now(); paintKiroku(key);
+    }).catch(function (e) { if (e && e.auth) return; k.err = (e && e.message) || String(e); paintKiroku(key); });
+  }
+  // 記録の 中身 — 商品ページの renderKiroku と 同じ（入庫・出庫/検品・部屋移動・場所・修正。新しい 順）
+  function kirokuEvents(d, p) {
+    var e = d.entry || {}; p = p || {};
+    var slash = function (s) { return String(s || "").replace(/-/g, "/"); };
+    var isMove = function (l) { return /部屋移動/.test(l.kind || ""); };
+    var inQty = e.qty != null && e.qty !== "" ? e.qty : p.nyukoQty;
+    return [{ d: slash(e.date || p.nyukoDate), t: "", kind: '<span class="k-in">入庫</span>', qty: inQty, left: inQty, sub: [], cx: false }]
+      .concat((d.out || []).map(function (o) {   // [出庫日, 出庫数, 最終在庫, 運送, 引取先, 担当者, 伝票ID, 取消, 予約, 時刻, 出庫ID]
+        return { d: o[0], t: o[9] || "", cx: !!o[7],
+          kind: (o[1] === 0 ? '<span class="k-kp">検品</span>' : '<span class="k-out">出庫</span>') + (o[8] === "予約" ? ' <span class="kr-tag yy">予約</span>' : ""),
+          qty: o[1] === 0 ? "" : o[1], left: o[2], sub: [o[4], o[3], o[5], [o[6], o[10]].filter(Boolean).join(" · ")] };
+      }))
+      .concat((d.loc || []).map(function (l) {
+        return { d: String(l.datetime).slice(0, 10), t: String(l.datetime).slice(11, 16), cx: false,
+          kind: (isMove(l) ? '<span class="k-move">部屋移動' + (/一部/.test(l.kind) ? "（一部）" : "") + "</span> " : '<span class="k-loc">場所</span> ') +
+            esc(l.oldLocation || "空欄") + " → <b>" + esc(l.newLocation || "空欄") + "</b>",
+          qty: isMove(l) ? l.qty : "", left: "", sub: [l.changedBy] };
+      }))
+      .concat((d.edit || []).map(function (x) {   // 入庫の 修正 [日時, 項目, 変更前, 変更後, 担当]
+        return { d: String(x[0]).slice(0, 10), t: String(x[0]).slice(11, 16), cx: false,
+          kind: x[1] === "キャンセル" ? '<span class="k-fix">入庫取消</span>' : '<span class="k-fix">修正</span> ' + esc(x[1]) + ": " + esc(x[2] || "空欄") + " → <b>" + esc(x[3] || "空欄") + "</b>",
+          qty: "", left: "", sub: [x[4]] };
+      }))
+      .sort(function (a, b) { var x = a.d + a.t, y = b.d + b.t; return x < y ? 1 : x > y ? -1 : 0; });
+  }
+  function kirokuRow(x) {
+    var has = function (v) { return v !== "" && v != null; };
+    var sub = x.sub.filter(has).map(esc).join(" · ");
+    return '<div class="kv' + (x.cx ? " cx" : "") + '"><div class="kv-d">' + esc(x.d) + (x.t ? "<span>" + esc(x.t) + "</span>" : "") + "</div>" +
+      '<div><div class="kv-k">' + x.kind + (x.cx ? ' <span class="kr-tag">取消</span>' : "") + "</div>" + (sub ? '<div class="kv-sub">' + sub + "</div>" : "") + "</div>" +
+      '<div class="kv-n">' + (has(x.qty) ? '<span class="kv-q">' + esc(x.qty) + "</span>" : "") + (has(x.left) ? '<span class="kv-left">残り ' + esc(x.left) + "</span>" : "") + "</div></div>";
+  }
+  function locHistHtml(loc) {
+    if (!loc || !loc.length) return '<div class="empty-msg">場所移動履歴が ありません</div>';
+    return loc.map(function (h, i) {
+      var mv = /部屋移動/.test(h.kind || "");
+      return '<div class="loc-row' + (i === 0 ? " current" : "") + '"><div style="min-width:0">' +
+        '<div class="loc-name" style="font-size:14px">' + (h.oldLocation ? esc(h.oldLocation) + " → " : "") + esc(h.newLocation) + "</div>" +
+        '<div class="loc-date" style="margin-top:3px">' + (mv ? '<span class="badge badge-move">' + esc(h.kind) + (h.qty !== "" && h.qty != null ? " " + esc(h.qty) : "") + "</span> " : "") + esc(h.changedBy || "—") + "</div></div>" +
+        '<div style="text-align:right;flex:none"><div class="loc-date">' + esc(h.datetime || "—") + "</div>" +
+        (i === 0 ? '<span class="badge badge-blue" style="margin-top:4px;display:inline-block">最新</span>' : "") + "</div></div>";
+    }).join("");
+  }
+  function paintKiroku(key) {
+    var card = $("card");
+    if (card.getAttribute("data-c") + "-" + card.getAttribute("data-id") !== key) return;
+    var area = $("kirokuArea"), hist = $("locHist"), n = $("kirokuN");
+    if (!area || !hist) return;
+    var k = kiroku[key] || {};
+    if (!k.d) {
+      var m = '<div class="empty-msg">' + (k.err ? "記録を 読めませんでした: " + esc(k.err) : "読み込み中…") + "</div>";
+      area.innerHTML = m; hist.innerHTML = m; if (n) n.textContent = ""; return;
+    }
+    var ev = kirokuEvents(k.d, cardItem);
+    if (n) n.textContent = ev.length;
+    area.innerHTML = '<div class="kv-h"><span>日付</span><span>内容</span><span>数・残り在庫</span></div>' + ev.map(kirokuRow).join("");
+    hist.innerHTML = locHistHtml(k.d.loc);
   }
   function setState(text, cls) { var el = $("cardState"); if (el) { el.textContent = text; el.className = "state " + (cls || ""); } }
   function flash() { var c = $("card"); c.classList.remove("flash"); void c.offsetWidth; c.classList.add("flash"); }
 
-  function showItem(c, id) {
+  function showItem(c, id, keepTab) {
     var my = ++seq, t0 = Date.now();
+    if (!keepTab) tab = "info";
+    loadKiroku(c, id);
     $("scanErr").textContent = "";
     var changedClient = !!cur && cur !== c;
     if (cur !== c) { cur = c; lsSet(K.c, JSON.stringify({ number: c })); }
@@ -469,7 +679,7 @@
       else {
         renderMsgCard(c, id, '<div style="margin-top:6px">読めませんでした: ' + esc(e.message) +
           '</div><button type="button" id="retryBtn" style="width:100%;margin-top:10px">もう一度</button>', true);
-        $("retryBtn").addEventListener("click", function () { showItem(c, id); focusScan(); });
+        $("retryBtn").addEventListener("click", function () { showItem(c, id, true); focusScan(); });
         beep(false);
       }
     });
@@ -594,6 +804,25 @@
     if (document.hidden) { camWasOpen = camShown(); if (camWasOpen) closeCam(); }
     else if (camWasOpen) { camWasOpen = false; if (camLive()) openCam(); }
   });
+
+  // ── 新しい 版が 出ていたら 読み直す（ホーム画面の アプリは 古い 版を しばらく 覚えている）──
+  // 開いた 時だけ（カメラを 開いた 後に 読み直すと また 許可を 聞くので）。同じ 版へは 1回だけ（ループ しない）。
+  var VERSION = "2026-11-09c";
+  $("verLbl").textContent = "版 " + VERSION;
+  function checkUpdate() {
+    if (!window.fetch) return;
+    fetch(location.pathname + "?nc=" + Date.now(), { cache: "no-store", credentials: "omit" })
+      .then(function (r) { return r.ok ? r.text() : ""; })
+      .then(function (t) {
+        var m = t.match(/var VERSION = "([^"]+)"/);
+        if (!m || m[1] === VERSION) return;
+        var tried = ""; try { tried = sessionStorage.getItem("nishiki_scan_upd") || ""; } catch (e) {}
+        if (tried === m[1] || camStream || camOpening) return;
+        try { sessionStorage.setItem("nishiki_scan_upd", m[1]); } catch (e) {}
+        location.replace(location.pathname + "?v=" + encodeURIComponent(m[1]) + (dep ? "&d=" + encodeURIComponent(dep) : ""));
+      }).catch(function () {});
+  }
+  checkUpdate();
 
   // ── はじめ ──
   if (!API) show("vSetup");
