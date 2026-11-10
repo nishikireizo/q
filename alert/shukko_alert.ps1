@@ -103,6 +103,8 @@ namespace NkAudio {
     }
     public static string List() { return Mta(() => ListI()); }
     public static string Start(int[] keep, float minVol) { return Mta(() => StartI(keep, minVol)); }
+    public static int Raise() { return Mta(() => RaiseI()); }
+    public static float Target = 0;
     public static int Refresh(int[] keep) { return Mta(() => RefreshI(keep)); }
     public static void End() { Mta(() => { EndI(); return 0; }); }
     public static void RestorePids(int[] pids, float master, bool mute) { Mta(() => { RestorePidsI(pids, master, mute); return 0; }); }
@@ -136,13 +138,17 @@ namespace NkAudio {
       var ev = Ev();
       if (ev != null) {
         float l; bool mu; ev.GetMasterVolumeLevelScalar(out l); ev.GetMute(out mu);
-        OldMaster = l; OldMute = mu; MasterChanged = mu || l < minVol;
-        if (mu) ev.SetMute(false, ref G);
-        if (l < minVol) ev.SetMasterVolumeLevelScalar(minVol, ref G);
-        t = "vol " + (int)Math.Round(l * 100) + "%" + (mu ? " muted" : "") + (MasterChanged ? " -> " + (int)Math.Round(Math.Max(l, minVol) * 100) + "%" : "");
+        OldMaster = l; OldMute = mu; MasterChanged = mu || l < minVol; Target = Math.Max(l, minVol);
+        t = "vol " + (int)Math.Round(l * 100) + "%" + (mu ? " muted" : "") + (MasterChanged ? " -> " + (int)Math.Round(Target * 100) + "%" : "");
       }
-      RefreshI(keep);
+      RefreshI(keep);   // ほかの アプリを 先に ミュート — 音量は まだ 上げない（Raise は 1.5秒 後）
       return t;
+    }
+    static int RaiseI() {
+      if (!MasterChanged) return 0;
+      var ev = Ev(); if (ev == null) return 0;
+      ev.SetMasterVolumeLevelScalar(Target, ref G); ev.SetMute(false, ref G);
+      return 1;
     }
     static int RefreshI(int[] keep) {
       int k = 0;
@@ -156,9 +162,11 @@ namespace NkAudio {
     }
     static void EndI() { RestorePidsI(MutedPids.ToArray(), MasterChanged ? OldMaster : -1, OldMute); MutedPids.Clear(); MasterChanged = false; }
     static void RestorePidsI(int[] pids, float master, bool mute) {
+      // 先に PC の 音量を 元に 下げる → 少し 待つ → それから ラジオ などの ミュートを 戻す（大きな 音が 一瞬 出ない ように）
+      if (master >= 0) { var ev = Ev(); if (ev != null) { ev.SetMasterVolumeLevelScalar(master, ref G); if (mute) ev.SetMute(true, ref G); } System.Threading.Thread.Sleep(500); }
       foreach (var p in Sessions()) if (Array.IndexOf(pids, p.Key) >= 0) p.Value.SetMute(false, ref G);
-      if (master >= 0) { var ev = Ev(); if (ev != null) { ev.SetMasterVolumeLevelScalar(master, ref G); if (mute) ev.SetMute(true, ref G); } }
     }
+    public static float Master() { return Mta(() => { var ev = Ev(); float l = -1; if (ev != null) ev.GetMasterVolumeLevelScalar(out l); return l; }); }
   }
 }
 '@
@@ -323,14 +331,21 @@ $MsgFile = Join-Path $env:TEMP ("nishiki_alert_" + $When + "_" + $PID + ".txt")
 [IO.File]::WriteAllText($MsgFile, $msg, (New-Object Text.UTF8Encoding $true))
 $script:child = $null; $script:soundDone = $false; $script:failed = $false; $script:acked = $false
 function StartSound {
-  if ($script:child -or $script:soundDone -or $script:failed -or -not (Test-Path $SoundPs)) { return }
+  if ($script:child -or $script:soundDone -or $script:failed -or $script:acked -or -not (Test-Path $SoundPs)) { return }
+  # 順番（2026-11-10 ユーザー）: ① ほかの アプリを ミュート → ② 1.5秒 待つ → ③ PC の 音量を 上げる → ④ チャイム
+  if (-not $script:ducked -and -not $script:duckWait) { DuckStart; if ($script:ducked) { $script:duckWait = (Get-Date).AddMilliseconds(1500); return } }
+  if ($script:duckWait) {
+    if ((Get-Date) -lt $script:duckWait) { return }
+    $script:duckWait = $null
+    try { if ([NkAudio.Mixer]::Raise() -gt 0) { Log ($When + " volume raised") } } catch { Log ("raise error: " + $_.Exception.Message) }
+  }
   $a = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden", "-File", ('"' + $SoundPs + '"'), "-MsgFile", ('"' + $MsgFile + '"'),
          "-Chime", ('"' + $Chime + '"'), "-Parent", $PID, "-Repeat", $Repeat, "-MaxMin", $MaxMin)
   if ($Silent) { $a += "-Silent" }
   $script:child = Start-Process -FilePath powershell.exe -ArgumentList $a -WindowStyle Hidden -PassThru
   $null = $script:child.Handle
   Log ($When + " sound start")
-  DuckStart
+  $script:lastDuck = (Get-Date).AddSeconds(-2.5)   # 0.5秒 後に お知らせの 音を 100% に
 }
 function VoiceInfo {
   try {
@@ -339,14 +354,14 @@ function VoiceInfo {
     if ($n.Count) { $n -join "/" } else { "no ja voice (chime only)" }
   } catch { "voice ?" }
 }
-$script:ducked = $false; $script:lastDuck = Get-Date
-function DuckStart {
-  if (($Silent -and -not $env:NK_DUCK_TEST) -or $script:ducked -or -not $script:child) { return }
+$script:ducked = $false; $script:duckWait = $null; $script:lastDuck = Get-Date
+function DuckStart {   # ① ほかの アプリを ミュート（お知らせの 音は まだ）
+  if (($Silent -and -not $env:NK_DUCK_TEST) -or $script:ducked) { return }
   $i = ""
   try {
     AudioLib; $min = [float]0.7
     if ($env:NK_DUCK_TEST) { [NkAudio.Mixer]::Skip = [int[]]@($env:NK_DUCK_TEST -split "," | Where-Object { $_ } | ForEach-Object { [int]$_ }); $min = [float]0 }   # テスト用 — ほかの アプリ・音量に 触らない
-    $i = [NkAudio.Mixer]::Start([int[]]@($PID, $script:child.Id), $min); $script:ducked = $true; SaveDuck
+    $i = [NkAudio.Mixer]::Start([int[]]@($PID), $min); $script:ducked = $true; SaveDuck
     $nm = @([NkAudio.Mixer]::MutedPids | ForEach-Object { try { (Get-Process -Id $_ -ErrorAction Stop).ProcessName } catch { [string]$_ } }) -join ","
     $i += "; muted: " + $(if ($nm) { $nm } else { "none" })
   } catch { $i = "duck error: " + $_.Exception.Message }
@@ -366,6 +381,7 @@ function DuckEnd {
   Remove-Item $DuckFile -ErrorAction SilentlyContinue
 }
 function StopSound {
+  $script:duckWait = $null
   if ($script:child) { try { if (-not $script:child.HasExited) { $script:child.Kill() } } catch {}; $script:child = $null; Log ($When + " sound stop") }
   DuckEnd
 }
@@ -373,7 +389,7 @@ function HmOf($ms) { try { [DateTimeOffset]::FromUnixTimeMilliseconds([int64]$ms
 function Apply($st) {
   if (-not $st) { return }
   if ($st.ack) { $script:acked = $true; StopSound; $okTxt.Text = "閉じる"; $foot.Text = "OK 済み — " + $st.ack.by + " " + (HmOf $st.ack.at) + "（音は 止まりました）"; return }
-  if ($st.play) { StartSound } elseif ($script:child) { StopSound }
+  if ($st.play) { StartSound } elseif ($script:child -or $script:ducked) { StopSound }
   $foot.Text = if ($st.sound) { "音: " + $st.sound + " の PC" + $(if ($st.play) { "（この PC）" } else { "" }) + " — OK を 押すまで 1分ごとに チャイムと 声" } else { "音: 順番を 待っています" }
 }
 function NewWc { $w = New-Object Net.WebClient; $w.Encoding = [Text.Encoding]::UTF8; $w }
@@ -396,6 +412,7 @@ $tick.Add_Tick({
       $script:lastPoll = Get-Date; $script:pend = (NewWc).DownloadStringTaskAsync($Base + "&act=poll")
     }
     if ($script:child -and ((Get-Date) - $script:lastOk).TotalSeconds -gt 60) { StopSound }   # サーバーに 届かない → 次の PC に まかせる
+    if ($script:duckWait -and (Get-Date) -ge $script:duckWait) { StartSound }   # ② の 1.5秒 が 過ぎた → ③ 音量 → ④ チャイム
     DuckRefresh
     if (((Get-Date) - $started).TotalMinutes -ge $MaxMin + 1) { $tick.Stop() }
   } catch { Log ("tick error: " + $_.Exception.Message) }
