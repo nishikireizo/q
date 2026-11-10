@@ -1,0 +1,28 @@
+# ニシキ冷蔵 — 出庫お知らせ を この PC に 入れる。PowerShell に 1行（$k = キー、$d = サーバー、$r = この PC の 番）:
+#   $k='…'; $d='…'; $r='…'; irm https://nishikireizo.github.io/q/alert/install.txt | iex
+& {
+  $ErrorActionPreference = "Stop"
+  if (-not $k -or -not $d) { Write-Host "  キー（`$k）と サーバー（`$d）が ありません — 送られた 1行を そのまま 貼って ください"; return }
+  [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+  $u = "https://script.google.com/macros/s/" + $d + "/exec"
+  Write-Host "  サーバーを 確かめて います…"
+  $c = Invoke-WebRequest -UseBasicParsing -TimeoutSec 90 -Uri ($u + "?api=alert&key=" + $k + "&act=check")
+  if ($c.Content -notmatch '"ok":true') { Write-Host "  キーか サーバーが ちがいます — 止めます"; return }
+  $D = Join-Path $env:USERPROFILE "nishiki-alert"
+  New-Item -ItemType Directory -Force $D | Out-Null
+  $src = "https://nishikireizo.github.io/q/alert/"; $nc = "?nc=" + (Get-Random)
+  foreach ($n in "shukko_alert.ps1", "shukko_sound.ps1", "setup.ps1", "watch.vbs", "test.bat", "chime.wav") {
+    Write-Host ("  ダウンロード: " + $n)
+    Invoke-WebRequest -UseBasicParsing -Uri ($src + $n + $nc) -OutFile (Join-Path $D $n)
+  }
+  $bom = New-Object Text.UTF8Encoding $true
+  foreach ($n in "shukko_alert.ps1", "shukko_sound.ps1", "setup.ps1") {
+    $p = Join-Path $D $n
+    $s = ([IO.File]::ReadAllText($p, [Text.Encoding]::UTF8) -replace "`r?`n", "`r`n").Replace("__DEPLOY__", $d).Replace("__KEY__", $k)
+    [IO.File]::WriteAllText($p, $s, $bom)
+  }
+  foreach ($n in "watch.vbs", "test.bat") { $p = Join-Path $D $n; [IO.File]::WriteAllText($p, ([IO.File]::ReadAllText($p) -replace "`r?`n", "`r`n"), [Text.Encoding]::ASCII) }
+  & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $D "setup.ps1") -Role $r
+  Write-Host ("  入れた 場所: " + $D)
+  Write-Host "  試す 時は その フォルダの test.bat（音が 出ます）"
+}
