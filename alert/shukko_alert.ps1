@@ -1,4 +1,4 @@
-﻿# ニシキ冷蔵 — 出庫お知らせ（PC）  upload 121
+# ニシキ冷蔵 — 出庫お知らせ（PC）  upload 121
 #   タスク スケジューラ が 毎日 15:30（-When 1530）と 16:15（-When 1615）に 動かす。
 #   サーバー（Apps Script api=alert）に まだ 🚚 出庫済み で ない 伝票を 聞く → あれば 窓（案 B — 残りの 行まで）。
 #   窓は ログインしている 全部の PC に 出る。音（チャイム ＋ 声）は 1台だけ — 順番は サーバーの ALERT_ORDER（1番 → 2番 → 3番）。
@@ -33,7 +33,7 @@ function GetJson($u, $sec) {
 
 # ── 見張り（-Watch・2分ごと 8:00〜18:00 — watch.vbs）— テスト送信が あれば 本物と 同じ お知らせを 出す（upload 122）──
 if ($Watch) {
-  try { $j = GetJson ($Base + "&act=check") 60 } catch { exit }
+  try { $j = GetJson ($Base + "&act=check") 60 } catch { try { [IO.File]::WriteAllText((Join-Path $Here "watch_error.txt"), (Get-Date -Format "yyyy-MM-dd HH:mm:ss") + "  " + $_.Exception.Message) } catch {}; exit }
   if ($j.ok -and $j.test -and $j.test.tid) {
     $sf = Join-Path $Here "seen_test.txt"; $seen = if (Test-Path $sf) { ([IO.File]::ReadAllText($sf)).Trim() } else { "" }
     if ($seen -ne [string]$j.test.tid) {

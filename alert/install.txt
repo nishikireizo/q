@@ -8,21 +8,22 @@
   Write-Host "  サーバーを 確かめて います…"
   $c = Invoke-WebRequest -UseBasicParsing -TimeoutSec 90 -Uri ($u + "?api=alert&key=" + $k + "&act=check")
   if ($c.Content -notmatch '"ok":true') { Write-Host "  キーか サーバーが ちがいます — 止めます"; return }
-  $D = Join-Path $env:USERPROFILE "nishiki-alert"
-  New-Item -ItemType Directory -Force $D | Out-Null
+  $inst = Join-Path $env:USERPROFILE "nishiki-alert"
+  New-Item -ItemType Directory -Force $inst | Out-Null
   $src = "https://nishikireizo.github.io/q/alert/"; $nc = "?nc=" + (Get-Random)
   foreach ($n in "shukko_alert.ps1", "shukko_sound.ps1", "setup.ps1", "watch.vbs", "test.bat", "chime.wav") {
     Write-Host ("  ダウンロード: " + $n)
-    Invoke-WebRequest -UseBasicParsing -Uri ($src + $n + $nc) -OutFile (Join-Path $D $n)
+    Invoke-WebRequest -UseBasicParsing -Uri ($src + $n + $nc) -OutFile (Join-Path $inst $n)
   }
   $bom = New-Object Text.UTF8Encoding $true
   foreach ($n in "shukko_alert.ps1", "shukko_sound.ps1", "setup.ps1") {
-    $p = Join-Path $D $n
+    $p = Join-Path $inst $n
     $s = ([IO.File]::ReadAllText($p, [Text.Encoding]::UTF8) -replace "`r?`n", "`r`n").Replace("__DEPLOY__", $d).Replace("__KEY__", $k)
+    if ($s.Contains("__DEPLOY__") -or $s.Contains("__KEY__") -or ($n -eq "shukko_alert.ps1" -and -not $s.Contains($u))) { Write-Host "  まちがい: サーバーの 住所が 正しく 入りません でした — 止めます"; return }
     [IO.File]::WriteAllText($p, $s, $bom)
   }
-  foreach ($n in "watch.vbs", "test.bat") { $p = Join-Path $D $n; [IO.File]::WriteAllText($p, ([IO.File]::ReadAllText($p) -replace "`r?`n", "`r`n"), [Text.Encoding]::ASCII) }
-  & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $D "setup.ps1") -Role $r
-  Write-Host ("  入れた 場所: " + $D)
+  foreach ($n in "watch.vbs", "test.bat") { $p = Join-Path $inst $n; [IO.File]::WriteAllText($p, ([IO.File]::ReadAllText($p) -replace "`r?`n", "`r`n"), [Text.Encoding]::ASCII) }
+  & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $inst "setup.ps1") -Role $r
+  Write-Host ("  入れた 場所: " + $inst)
   Write-Host "  試す 時は その フォルダの test.bat（音が 出ます）"
 }
