@@ -264,6 +264,31 @@
               border-radius: 999px; padding: 0 8px; line-height: 18px; }
   .pk-sep { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; color: var(--muted); margin: 14px 2px 8px; }
   .pk-sep::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+  /* ══ 🚚 積み込み（出庫 確定）— 積み込み待ち = 青、出庫済み = 緑 ══ */
+  :root { --blue: #1d5f8a; --blue-bg: #e3f0fa; --blue-border: #9cc6e6; }
+  .ld { margin: 0 0 10px; padding: 14px; border-radius: 16px; background: var(--blue-bg); border: 2px solid var(--blue-border); }
+  .ld-t { font-size: 17px; font-weight: 700; color: var(--blue); }
+  .ld-s { font-size: 13px; color: var(--text-2); margin: 2px 0 10px; }
+  .ld-btn { width: 100%; height: 64px; border-radius: 14px; border: 0; background: var(--blue); color: #fff; font-size: 20px; font-weight: 700; }
+  .shipped { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin: 0 0 10px; padding: 14px; border-radius: 14px;
+             background: var(--accent); color: #fff; font-size: 17px; font-weight: 700; }
+  .shipped small { display: block; font-size: 12px; font-weight: 500; opacity: .9; }
+  .shipped button { flex: none; background: #fff; color: var(--accent); font-size: 12px; font-weight: 700; padding: 6px 10px; }
+  .pl.gone { opacity: .55; }
+  .slip-tag.ld { background: var(--blue-bg); color: var(--blue); border-color: var(--blue-border); }
+  .slip-tag.sh { background: var(--accent-bg); color: var(--accent); border-color: var(--accent-mid); }
+  .slip.ldw { border: 2px solid var(--blue-border); }
+  .pop.ask .pop-card { border-color: var(--blue); }
+  .pop.ask .pop-ic { background: var(--blue); font-size: 64px; }
+  .pop.ask .pop-t { color: var(--blue); }
+  .pop-btns { display: grid; grid-template-columns: 1fr 1.6fr; gap: 10px; margin-top: 18px; }
+  .pop-btns button { height: 58px; font-size: 19px; font-weight: 700; border-radius: 14px; }
+  .pop-btns .go { background: var(--blue); border-color: var(--blue); color: #fff; }
+  .lines-mini { text-align: left; margin-top: 10px; font-size: 14px; background: var(--surface-2); border-radius: 12px; padding: 8px 12px; }
+  .lines-mini div { display: flex; justify-content: space-between; gap: 10px; padding: 3px 0; }
+  .pk-alert { margin: 0 0 10px; padding: 12px 14px; border-radius: 14px; background: var(--red-bg); border: 2px solid #c8432b; color: var(--red);
+              font-size: 15px; font-weight: 700; line-height: 1.5; }
+  .pk-alert span { display: block; font-size: 13px; font-weight: 500; color: var(--text); }
   /* ══ スキャン結果の ポップアップ ══ */
   .pop { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; padding: 20px;
          background: rgba(20, 40, 35, .45); }
@@ -413,6 +438,11 @@
       <div class="pop-card"><div class="pop-ic" id="popIc"></div><div class="pop-code" id="popCode"></div>
         <div class="pop-t" id="popT"></div><div class="pop-s" id="popS"></div>
         <button type="button" class="primary pop-ok" id="popOk">OK</button></div>
+    </div>
+    <div id="shipAsk" class="pop ask hidden" role="dialog">
+      <div class="pop-card"><div class="pop-ic">🚚</div><div class="pop-t">出庫を 確定しますか？</div><div class="pop-s" id="shipS"></div>
+        <div class="lines-mini" id="shipL"></div>
+        <div class="pop-btns"><button type="button" id="shipNo">もどる</button><button type="button" class="go" id="shipGo">確定する</button></div></div>
     </div>
     <div class="foot"><button type="button" class="link" id="logoutBtn">この 端末の ログインを やめる</button><div class="ver" id="verLbl"></div></div>
   </div>
@@ -892,6 +922,25 @@
     });
     return m;
   }
+  function shipped(s) { return slipLines(s)["🚚"] || null; }   // 🚚 出庫済み（確定した 人・時刻）
+  // 出庫お知らせ — 15:30 = 印刷から 2時間 以上（13:30 まで・前の日）、16:15 = 全部。今日だけ。
+  var alertDone = "";
+  function lateSlips() {
+    var now = new Date(), hm = now.getHours() * 100 + now.getMinutes(), ph = hm >= 1615 ? "1615" : hm >= 1530 ? "1530" : "";
+    if (!ph || pk.date !== dayStr(now) || !pk.slips) return { ph: "", list: [] };
+    var today = pk.date.split("/").join("");
+    return { ph: ph, list: pk.slips.filter(function (x) {
+      if (shipped(x)) return false;
+      var dk = x.key.slice(x.key.indexOf("_") + 1);
+      return ph === "1615" || (dk.charAt(8) === "_" && dk.slice(0, 8) < today) || (!!x.time && x.time <= "13:30");
+    }) };
+  }
+  function alertHtml() {
+    var a = lateSlips(); if (!a.list.length) return "";
+    if (alertDone !== pk.date + a.ph) { alertDone = pk.date + a.ph; beep(false); setTimeout(function () { beep(false); }, 700); }
+    return '<div class="pk-alert">⚠ 出庫お知らせ（' + (a.ph === "1615" ? "16:15 — 締めの 前" : "15:30 — 2時間 以上 前") + "）まだ 出庫済みで ない 伝票 " + a.list.length + " 件" +
+      "<span>" + a.list.map(function (x) { var n = slipCount(x); return esc((x.time || "—") + " " + x.client + ([x.hikitori ? "引取先 " + x.hikitori : "", x.tantou ? "担当 " + x.tantou : ""].filter(Boolean).map(function (v) { return " · " + v; }).join("")) + "（" + (n === x.lines.length ? "積み込み待ち" : n ? "ピッキング中 " + n + "/" + x.lines.length : "まだ") + "）"); }).join("<br>") + "</span></div>";
+  }
   function slipCount(s) { var m = slipLines(s), n = 0; s.lines.forEach(function (l) { if (m[l.id]) n++; }); return n; }
   function slipWho(s) {
     var m = slipLines(s), by = {}, last = null;
@@ -991,25 +1040,25 @@
     return n ? '<div class="pk-q">📶 未送信 ' + n + " — 電波が 戻ったら 送ります</div>" : "";
   }
   function renderSlipList(open) {   // open = 伝票を 開いて いる（メッセージは 伝票の 方に 出す）
-    var slips = pk.slips || [], done = 0;
-    slips.forEach(function (s) { if (slipCount(s) === s.lines.length) done++; });
+    var slips = pk.slips || [], done = 0, wait = 0;
+    slips.forEach(function (s) { if (shipped(s)) done++; else if (slipCount(s) === s.lines.length) wait++; });
     $("pickList").innerHTML =
       '<div class="pk-date"><button type="button" class="refresh-btn" data-pk="prev">‹ 前の日</button><b>' + esc(dayLabel(pk.date)) +
         '</b><button type="button" class="refresh-btn" data-pk="next">次の日 ›</button></div>' +
-      (open ? "" : msgHtml() + qNote()) +
+      alertHtml() + (open ? "" : msgHtml() + qNote()) +
       '<div class="pk-sum">' + (pk.loading ? "読み込み中…" : pk.err ? '<span class="err">読めませんでした: ' + esc(pk.err) + "</span>" :
-        "伝票 " + slips.length + "・完了 " + done) + '<button type="button" class="link" data-pk="reload">↻ 読み直す</button></div>' +
+        "伝票 " + slips.length + (wait ? "・積み込み待ち " + wait : "") + "・出庫済み " + done) + '<button type="button" class="link" data-pk="reload">↻ 読み直す</button></div>' +
       (!pk.loading && !pk.err && !slips.length ? '<div class="hint">この 日の 出庫は ありません</div>' : "") +
       (slips.length ? '<div class="pk-hint">伝票を えらぶ か、品物の ラベルを スキャン → その 品番の 伝票が 開きます</div>' : "") +
-      slips.map(function (s, i) { return { s: s, i: i, d: slipCount(s) === s.lines.length }; })
+      slips.map(function (s, i) { return { s: s, i: i, d: !!shipped(s) }; })
         .sort(function (a, b) { return (a.d - b.d) || (a.i - b.i); })   // 済んだ 伝票は 下へ
         .map(function (o, j, arr) {
-        var s = o.s, n = slipCount(s), all = s.lines.length, ok = o.d, who = slipWho(s);
-        return (ok && (j === 0 || !arr[j - 1].d) ? '<div class="pk-sep">✓ 完了 ' + done + "</div>" : "") +
-          '<button type="button" class="slip' + (ok ? " done" : "") + (s.key === pk.open ? " cur" : "") + '" data-slip="' + esc(s.key) + '">' +
+        var s = o.s, n = slipCount(s), all = s.lines.length, ok = o.d, full = n === all, sh = shipped(s), who = slipWho(s);
+        return (ok && (j === 0 || !arr[j - 1].d) ? '<div class="pk-sep">🚚 出庫済み ' + done + "</div>" : "") +
+          '<button type="button" class="slip' + (ok ? " done" : full ? " ldw" : "") + (s.key === pk.open ? " cur" : "") + '" data-slip="' + esc(s.key) + '">' +
           '<div class="slip-top"><span class="slip-time">' + esc(s.time || "—") + '</span><span class="slip-cl">' + esc(s.client) + "</span>" +
-            (n && !ok ? '<span class="slip-tag">ピッキング中</span>' : "") +
-            '<span class="slip-n' + (ok ? " ok" : n ? " mid" : "") + '">' + (ok ? "✓ 完了" : n + " / " + all) + "</span></div>" +
+            (ok ? '<span class="slip-tag sh">🚚 ' + (sh.at ? hhmm(sh.at) : "") + "</span>" : full ? '<span class="slip-tag ld">🚚 積み込み待ち</span>' : n ? '<span class="slip-tag">ピッキング中</span>' : "") +
+            '<span class="slip-n' + (full ? " ok" : n ? " mid" : "") + '">' + (ok ? "✓" : n + " / " + all) + "</span></div>" +
           '<div class="slip-sub">' + esc([s.hikitori, s.unso, s.tantou].filter(Boolean).join(" · ") || "—") + " · " + all + " 行" +
             (who.names.length ? ' <span class="slip-who">' + (ok ? "✓ " : "") + esc(who.names.join("・")) + "</span>" : "") + "</div>" +
           '<div class="pbar"><i style="width:' + Math.round(n * 100 / all) + '%"></i></div></button>';
@@ -1018,7 +1067,7 @@
   function renderSlip(s) {
     var m = slipLines(s), n = slipCount(s), all = s.lines.length, ok = n === all;
     var lines = s.lines.slice().sort(function (a, b) { var x = locKey(a.loc), y = locKey(b.loc); return x < y ? -1 : x > y ? 1 : 0; });
-    var ats = Object.keys(m).map(function (k) { return m[k].at || 0; }).filter(Boolean);
+    var sh = m["🚚"] || null, ats = s.lines.map(function (l) { return (m[l.id] && m[l.id].at) || 0; }).filter(Boolean);
     var took = ok && ats.length > 1 ? Math.round((Math.max.apply(null, ats) - Math.min.apply(null, ats)) / 1000) : 0;
     $("pickSlip").innerHTML =
       '<div class="hero pk-hero"><div class="hero-top"><div style="flex:1;min-width:0">' +
@@ -1029,11 +1078,13 @@
         '<div class="stock-pill' + (ok ? "" : n ? " low" : " zero") + '"><div class="stock-num">' + n + "/" + all + '</div><div class="stock-label">チェック</div></div>' +
       '</div><div class="pbar big"><i style="width:' + Math.round(n * 100 / all) + '%"></i></div></div>' +
       msgHtml() + qNote() +
-      (ok ? '<div class="pk-done">✓ 全部 そろいました（' + all + " 行" + (took ? "・" + Math.floor(took / 60) + "分" + (took % 60) + "秒" : "") + '）<button type="button" class="refresh-btn" data-pk="close">伝票 一覧へ</button></div>' : "") +
+      (sh ? '<div class="shipped"><div>🚚 出庫 済み<small>' + (sh.at ? hhmm(sh.at) + " " : "") + esc(sh.by || "") + " が 確定" + (sh.wait ? "・未送信" : "") + '</small></div><button type="button" data-pk="unship">確定を 取り消す</button></div>'
+        : ok ? '<div class="ld"><div class="ld-t">✓ ピッキング 完了 — 積み込み待ち</div><div class="ld-s">トラックに 積んだら 押す → 出庫 確定。押すまで 出庫済みに なりません。' +
+          (took ? "（" + Math.floor(took / 60) + "分" + (took % 60) + "秒）" : "") + '</div><button type="button" class="ld-btn" data-pk="ship">🚚 トラックに 積んだ</button></div>' : "") +
       '<div class="pane active pk-lines"><div class="sec-head">場所の 順・ラベルを 読むと ✓</div>' +
       lines.map(function (l) {
         var d = m[l.id], old = olderLots(s, l), u = unitOf(s.c, l.id);
-        return '<div class="pl' + (d ? " ok" : "") + (pk.msg && pk.msg.line === l.id ? " last" : "") + '" data-line="' + esc(l.id) + '">' +
+        return '<div class="pl' + (d ? " ok" : "") + (sh ? " gone" : "") + (pk.msg && pk.msg.line === l.id ? " last" : "") + '" data-line="' + esc(l.id) + '">' +
           '<div class="pl-loc">' + esc(l.loc || "—") + "</div>" +
           '<div class="pl-main"><div class="pl-id">' + esc(l.id) + (l.yoyaku ? ' <span class="kr-tag yy">予約</span>' : "") + "</div>" +
             '<div class="pl-name">' + esc(l.name) + "</div>" +
@@ -1085,6 +1136,16 @@
     else if (a === "prev" || a === "next") { pk.date = dayShift(pk.date, a === "prev" ? -1 : 1); pk.open = ""; pk.msg = null; loadSlips(); }
     else if (a === "reload") { pk.msg = null; loadSlips(); }
     else if (a === "close") { pk.open = ""; pk.msg = null; renderPick(); window.scrollTo(0, 0); }
+    else if (a === "ship" && s && slipCount(s) === s.lines.length) {
+      $("shipS").textContent = s.client + " · " + (s.time || "") + " · " + s.lines.length + " 行";
+      $("shipL").innerHTML = s.lines.map(function (l) { return "<div><span>" + esc(l.id + " " + l.name) + "</span><b>" + esc(l.qty + " " + unitOf(s.c, l.id)) + "</b></div>"; }).join("");
+      $("shipAsk").dataset.key = s.key; $("shipAsk").classList.remove("hidden"); return;
+    }
+    else if (a === "unship" && s) {
+      if (!confirm("出庫 確定を 取り消しますか？（積み込み待ちに 戻ります）")) return;
+      queuePick(s, "🚚", false, true); pk.msg = null; renderPick();
+    }
+    else if (b.hasAttribute("data-line") && s && shipped(s)) { pickMsg("warn", "", "出庫済みです — 直す 時は 先に「確定を 取り消す」"); renderPick(); }
     else if (a === "reset" && s) {
       var on = slipLines(s);
       if (!Object.keys(on).length || !confirm("この 伝票の チェックを 全部 消して やり直しますか？（ほかの スマホ・PC からも 消えます）")) return;
@@ -1096,6 +1157,12 @@
       else { if (!confirm(id + " を 手で チェック しますか？（ラベルが 読めない 時だけ）")) return; queuePick(s, id, true, true); }
       pk.msg = null; renderPick();
     }
+    focusScan();
+  });
+  $("shipNo").addEventListener("click", function () { $("shipAsk").classList.add("hidden"); focusScan(); });
+  $("shipGo").addEventListener("click", function () {
+    var s = slipByKey($("shipAsk").dataset.key || ""); $("shipAsk").classList.add("hidden");
+    if (s && !shipped(s)) { queuePick(s, "🚚", true, true); pk.msg = null; beep(true); renderPick(); }
     focusScan();
   });
   function setState(text, cls) { var el = $("cardState"); if (el) { el.textContent = text; el.className = "state " + (cls || ""); } }
@@ -1286,7 +1353,7 @@
 
   // ── 新しい 版が 出ていたら 読み直す（ホーム画面の アプリは 古い 版を しばらく 覚えている）──
   // 開いた 時だけ（カメラを 開いた 後に 読み直すと また 許可を 聞くので）。同じ 版へは 1回だけ（ループ しない）。
-  var VERSION = "2026-11-10b";
+  var VERSION = "2026-11-10c";
   $("verLbl").textContent = "版 " + VERSION;
   function checkUpdate() {
     if (!window.fetch) return;
