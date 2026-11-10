@@ -210,6 +210,10 @@
   .tile.soon { opacity: .55; box-shadow: none; }
   /* ══ 出庫 ピッキング ══ */
   #pickView { padding: 0 12px; }
+  #pickView.open #pickList, #pickView:not(.open) #pickSlip { display: none; }   /* スマホ: 一覧 か 伝票 の どちらか */
+  .pk-empty { text-align: center; color: var(--text-2); font-size: 15px; line-height: 1.7; padding: 60px 20px; background: var(--surface);
+              border: 1px dashed var(--accent-mid); border-radius: var(--radius); }
+  .pk-empty b { display: block; font-size: 36px; color: var(--accent-mid); margin-bottom: 6px; }
   .pk-date { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 0 0 8px; }
   .pk-date b { font-size: 15px; }
   .pk-sum { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--text-2); margin: 4px 2px 6px; }
@@ -217,7 +221,7 @@
   .pk-hint { font-size: 12px; color: var(--muted); margin: 0 2px 8px; }
   .slip { display: block; width: 100%; text-align: left; margin-bottom: 8px; padding: 12px 14px; background: var(--surface);
           border: 1px solid var(--border); border-radius: 14px; }
-  .slip.done { background: var(--surface-2); }
+  .slip.done { background: var(--surface-2); opacity: .55; }
   .slip.done .slip-cl, .slip.done .slip-time { color: var(--muted); }
   .slip-top { display: flex; align-items: baseline; gap: 10px; }
   .slip-time { font: 500 15px var(--mono); color: var(--text-2); flex: none; }
@@ -238,7 +242,7 @@
   .pk-done { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin: 0 0 10px; padding: 14px; border-radius: 14px;
              background: var(--accent); color: #fff; font-size: 16px; font-weight: 700; }
   .pk-lines { padding-bottom: 6px; }
-  .pl { display: grid; grid-template-columns: 74px minmax(0, 1fr) auto 26px; gap: 8px; align-items: center; padding: 10px 2px;
+  .pl { display: grid; grid-template-columns: 88px minmax(0, 1fr) auto 26px; gap: 8px; align-items: center; padding: 10px 2px;
         border-bottom: 1px solid #edf3f6; cursor: pointer; }
   .pl.last { background: var(--accent-bg); border-radius: 10px; }
   .pl-loc { font: 700 20px var(--mono); color: var(--accent); line-height: 1.1; word-break: break-all; }
@@ -256,6 +260,71 @@
   .pk-foot { text-align: center; padding-top: 10px; }
   .pk-q { margin: 0 0 10px; padding: 8px 12px; border-radius: 10px; font-size: 13px; font-weight: 700; background: var(--amber-bg); color: var(--amber); border: 1px dashed var(--amber-border); }
   .slip-who { color: var(--accent); font-weight: 700; }
+  .slip-tag { flex: none; font-size: 11px; font-weight: 700; color: var(--amber); background: var(--amber-bg); border: 1px solid var(--amber-border);
+              border-radius: 999px; padding: 0 8px; line-height: 18px; }
+  .pk-sep { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; color: var(--muted); margin: 14px 2px 8px; }
+  .pk-sep::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+  /* ══ スキャン結果の ポップアップ ══ */
+  .pop { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; padding: 20px;
+         background: rgba(20, 40, 35, .45); }
+  .pop-card { width: min(100%, 440px); background: #fff; border-radius: 24px; padding: 28px 22px 22px; text-align: center;
+              box-shadow: 0 18px 50px rgba(0,0,0,.25); border: 4px solid var(--accent); animation: popin .16s ease-out; }
+  @keyframes popin { from { transform: scale(.85); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  .pop-ic { width: 128px; height: 128px; margin: 0 auto 12px; border-radius: 50%; background: var(--accent); color: #fff;
+            font: 700 84px/128px "Noto Sans JP", system-ui, sans-serif; }
+  .pop-code { font: 500 14px var(--mono); color: var(--muted); }
+  .pop-t { font-size: 22px; font-weight: 700; line-height: 1.45; margin-top: 4px; word-break: break-word; }
+  .pop-s { font-size: 15px; font-weight: 500; line-height: 1.55; margin-top: 6px; color: var(--text-2); word-break: break-word; }
+  .pop-s:empty { display: none; }
+  .pop-ok { width: 100%; height: 58px; margin-top: 18px; font-size: 22px; border-radius: 14px; }
+  .pop.ok .pop-t { color: var(--accent); }
+  .pop.bad .pop-card { border-color: var(--red); }
+  .pop.bad .pop-ic { background: #c8432b; }
+  .pop.bad .pop-t { color: var(--red); }
+  .pop.bad .pop-ok { background: #c8432b; border-color: #c8432b; }
+  .pop.warn .pop-card { border-color: var(--amber-border); }
+  .pop.warn .pop-ic { background: #d9a21b; }
+  .pop.warn .pop-t { color: var(--amber); }
+  .pop.warn .pop-ok { background: #b8860b; border-color: #b8860b; }
+  .pop-card.shake { animation: shake .3s; }
+  @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-10px); } 75% { transform: translateX(10px); } }
+  /* ══ タブレット（幅 700px 以上・iPad / Android タブレット・スマホの 横向き）══
+     左 = 得意先・スキャン欄・カメラ・一覧（伝票 / 最近）、右 = 開いた 伝票 / 商品カード */
+  @media (min-width: 700px) {
+    body { font-size: 16px; }
+    .wrap { max-width: 1280px; padding: 0 10px 40px; }
+    #vSetup, #vLogin { max-width: 560px; margin: 0 auto; }
+    .bar { margin: 12px 6px 0; }
+    .menu { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; padding: 16px 6px; }
+    .menu .tile { min-height: 200px; padding: 24px 22px; gap: 8px; }
+    .menu .tile .ti { font-size: 44px; }
+    .menu .tile b { font-size: 26px; }
+    .menu .tile span:last-child { font-size: 14px; }
+    #workView { display: grid; grid-template-columns: minmax(280px, 34%) minmax(0, 1fr); grid-template-rows: auto 1fr; column-gap: 6px; align-items: start; }
+    #lookupView, #pickView { display: contents; }
+    .wv-side { grid-column: 1; grid-row: 1; }
+    #recentBox, #pickList { grid-column: 1; grid-row: 2; }
+    #card, #pickSlip { grid-column: 2; grid-row: 1 / span 2; margin: 12px 6px 14px; }
+    #pickList { padding: 0 6px; }
+    #pickView.open #pickList, #pickView:not(.open) #pickSlip { display: block; }
+    #recentBox { margin: 0 6px; border-radius: 14px; overflow: hidden; }
+    .recent-h { padding: 0 10px 6px; }
+    .slip.cur { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-mid); }
+    .pk-date .refresh-btn { white-space: nowrap; flex: none; padding: 7px 10px; }
+    .pk-date b { text-align: center; font-size: 14px; }
+    .pk-hero .hero-number { font-size: 26px; }
+    .pl { grid-template-columns: 124px minmax(0, 1fr) auto 32px; gap: 12px; padding: 12px 6px; }
+    .pl-loc { font-size: 26px; }
+    .pl-id { font-size: 15px; }
+    .pl-name { font-size: 16px; }
+    .pl-in, .pl-fifo { font-size: 13px; }
+    .pl-qty b { font-size: 26px; }
+    .pl-st { width: 32px; height: 32px; font-size: 17px; line-height: 28px; }
+    .pk-msg { font-size: 16px; }
+    .info-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+    .cam { margin: 0 6px 12px; }
+    .sec { padding: 12px 6px; }
+  }
   @media (max-width: 360px) { .hero-number, .stock-num { font-size: 24px; } }
 </style>
 </head>
@@ -306,6 +375,7 @@
       <div class="msg" id="homeMsg" style="text-align:center"></div>
     </div>
     <div id="workView" class="hidden">
+    <div class="wv-side">
     <div class="bar" id="clientBar" style="padding:10px 16px">
       <div style="min-width:0">
         <div class="sub">得意先（ラベルで 決まる）</div>
@@ -331,12 +401,18 @@
       <div class="frame"></div>
       <div class="camfoot"><span id="camMsg">QR を 枠に 入れて ください</span><button type="button" id="camClose">閉じる</button></div>
     </div>
+    </div>
     <div id="lookupView">
       <div class="box card" id="card"></div>
-      <div class="recent-h" id="recentH"></div>
-      <div id="recent"></div>
+      <div id="recentBox"><div class="recent-h" id="recentH"></div><div id="recent"></div></div>
     </div>
-    <div id="pickView" class="hidden"></div>
+    <div id="pickView" class="hidden"><div id="pickList"></div><div id="pickSlip"></div></div>
+    </div>
+    <!-- スキャン結果（出庫）: ✓ は 1秒ちょっとで 消える。✕・⚠ は OK を 押すまで 残る（その 間の スキャンは 受けない）-->
+    <div id="pop" class="pop hidden" role="alertdialog" aria-live="assertive">
+      <div class="pop-card"><div class="pop-ic" id="popIc"></div><div class="pop-code" id="popCode"></div>
+        <div class="pop-t" id="popT"></div><div class="pop-s" id="popS"></div>
+        <button type="button" class="primary pop-ok" id="popOk">OK</button></div>
     </div>
     <div class="foot"><button type="button" class="link" id="logoutBtn">この 端末の ログインを やめる</button><div class="ver" id="verLbl"></div></div>
   </div>
@@ -747,6 +823,7 @@
     $("mnTitle").textContent = MODE_TITLE[m] || "";
     $("scanErr").textContent = ""; $("homeMsg").textContent = "";
     if (m === "home") closeCam();
+    hidePop();
     if (m === "shukko") pickEnter();
     if (m !== "home") focusScan();
     window.scrollTo(0, 0);
@@ -785,7 +862,24 @@
   function normName(s) { return normalize(s).toLowerCase(); }
   function slipByKey(k) { return (pk.slips || []).filter(function (s) { return s.key === k; })[0] || null; }
   function unitOf(c, id) { var it = lists[c] && lists[c].items[id]; return (it && it.nishikata) || ""; }
-  function pickMsg(kind, code, text, line) { pk.msg = { kind: kind, code: code, text: text, line: line || "" }; }
+  function pickMsg(kind, code, text, line) { pk.msg = { kind: kind, code: code, text: text, line: line || "" }; if (mode === "shukko") showPop(kind, code, text); }
+  // ══ スキャン結果の ポップアップ — ✓ は 自動で 消える、✕（ちがう）と ⚠（もう 済み・古い ロット）は OK を 押すまで ══
+  var popTimer = null, popHold = false;
+  function showPop(kind, code, text) {
+    var i = text.indexOf(" — "), t = i < 0 ? text : text.slice(0, i), sub = i < 0 ? "" : text.slice(i + 3);
+    clearTimeout(popTimer);
+    $("pop").className = "pop " + kind;
+    $("popIc").textContent = kind === "ok" ? "✓" : kind === "bad" ? "✕" : (t.charAt(0) === "✓" ? "✓" : "!");
+    $("popCode").textContent = code || "";
+    $("popT").textContent = t.replace(/^✓ /, "");
+    $("popS").textContent = sub;
+    popHold = kind !== "ok";
+    $("popOk").classList.toggle("hidden", !popHold);
+    if (!popHold) popTimer = setTimeout(hidePop, 1300);
+  }
+  function hidePop() { var was = !$("pop").classList.contains("hidden"); clearTimeout(popTimer); popHold = false; $("pop").className = "pop hidden"; if (was && mode !== "home") focusScan(); }
+  $("popOk").addEventListener("click", hidePop);
+  $("pop").addEventListener("click", function (e) { if (!popHold && e.target !== $("popOk")) hidePop(); });   // ✓ は どこを 押しても 消える
   function saveQ() { lsSet(PQ_KEY, JSON.stringify(pickQ)); }
 
   // いまの ✓ = サーバーの ✓ ＋ まだ 送って いない 分
@@ -883,7 +977,10 @@
     if (mode !== "shukko") return;
     var s = pk.open && slipByKey(pk.open);
     $("mnTitle").textContent = s ? "出庫 ピッキング" : "出庫";
-    if (s) renderSlip(s); else renderSlipList();
+    $("pickView").classList.toggle("open", !!s);
+    renderSlipList(!!s);
+    if (s) renderSlip(s);
+    else $("pickSlip").innerHTML = '<div class="pk-empty"><b>←</b>伝票を えらぶ か、品物の ラベルを スキャン<br><span class="sub">その 品番の 伝票が ここに 開きます</span></div>';
   }
   function msgHtml() {
     var m = pk.msg; if (!m) return "";
@@ -893,24 +990,28 @@
     var n = pickQ.filter(function (q) { return q.date === pk.date; }).length;
     return n ? '<div class="pk-q">📶 未送信 ' + n + " — 電波が 戻ったら 送ります</div>" : "";
   }
-  function renderSlipList() {
+  function renderSlipList(open) {   // open = 伝票を 開いて いる（メッセージは 伝票の 方に 出す）
     var slips = pk.slips || [], done = 0;
     slips.forEach(function (s) { if (slipCount(s) === s.lines.length) done++; });
-    $("pickView").innerHTML =
+    $("pickList").innerHTML =
       '<div class="pk-date"><button type="button" class="refresh-btn" data-pk="prev">‹ 前の日</button><b>' + esc(dayLabel(pk.date)) +
         '</b><button type="button" class="refresh-btn" data-pk="next">次の日 ›</button></div>' +
-      msgHtml() + qNote() +
+      (open ? "" : msgHtml() + qNote()) +
       '<div class="pk-sum">' + (pk.loading ? "読み込み中…" : pk.err ? '<span class="err">読めませんでした: ' + esc(pk.err) + "</span>" :
         "伝票 " + slips.length + "・完了 " + done) + '<button type="button" class="link" data-pk="reload">↻ 読み直す</button></div>' +
       (!pk.loading && !pk.err && !slips.length ? '<div class="hint">この 日の 出庫は ありません</div>' : "") +
       (slips.length ? '<div class="pk-hint">伝票を えらぶ か、品物の ラベルを スキャン → その 品番の 伝票が 開きます</div>' : "") +
-      slips.map(function (s) {
-        var n = slipCount(s), all = s.lines.length, ok = n === all, who = slipWho(s);
-        return '<button type="button" class="slip' + (ok ? " done" : "") + '" data-slip="' + esc(s.key) + '">' +
+      slips.map(function (s, i) { return { s: s, i: i, d: slipCount(s) === s.lines.length }; })
+        .sort(function (a, b) { return (a.d - b.d) || (a.i - b.i); })   // 済んだ 伝票は 下へ
+        .map(function (o, j, arr) {
+        var s = o.s, n = slipCount(s), all = s.lines.length, ok = o.d, who = slipWho(s);
+        return (ok && (j === 0 || !arr[j - 1].d) ? '<div class="pk-sep">✓ 完了 ' + done + "</div>" : "") +
+          '<button type="button" class="slip' + (ok ? " done" : "") + (s.key === pk.open ? " cur" : "") + '" data-slip="' + esc(s.key) + '">' +
           '<div class="slip-top"><span class="slip-time">' + esc(s.time || "—") + '</span><span class="slip-cl">' + esc(s.client) + "</span>" +
+            (n && !ok ? '<span class="slip-tag">ピッキング中</span>' : "") +
             '<span class="slip-n' + (ok ? " ok" : n ? " mid" : "") + '">' + (ok ? "✓ 完了" : n + " / " + all) + "</span></div>" +
           '<div class="slip-sub">' + esc([s.hikitori, s.unso, s.tantou].filter(Boolean).join(" · ") || "—") + " · " + all + " 行" +
-            (who.names.length ? ' <span class="slip-who">' + (ok ? "✓ " : "ピッキング中 ") + esc(who.names.join("・")) + "</span>" : "") + "</div>" +
+            (who.names.length ? ' <span class="slip-who">' + (ok ? "✓ " : "") + esc(who.names.join("・")) + "</span>" : "") + "</div>" +
           '<div class="pbar"><i style="width:' + Math.round(n * 100 / all) + '%"></i></div></button>';
       }).join("");
   }
@@ -919,7 +1020,7 @@
     var lines = s.lines.slice().sort(function (a, b) { var x = locKey(a.loc), y = locKey(b.loc); return x < y ? -1 : x > y ? 1 : 0; });
     var ats = Object.keys(m).map(function (k) { return m[k].at || 0; }).filter(Boolean);
     var took = ok && ats.length > 1 ? Math.round((Math.max.apply(null, ats) - Math.min.apply(null, ats)) / 1000) : 0;
-    $("pickView").innerHTML =
+    $("pickSlip").innerHTML =
       '<div class="hero pk-hero"><div class="hero-top"><div style="flex:1;min-width:0">' +
           '<div class="hero-eyebrow"><span>出庫 · ' + esc(dayLabel(pk.date)) + " · " + esc(s.time || "") + "</span></div>" +
           '<div class="hero-number pk-cl">' + esc(s.client) + "</div>" +
@@ -950,11 +1051,12 @@
   // ラベルを 読んだ 時（出庫 モード）
   function pickScan(c, id) {
     var code = c + "-" + id;
+    if (popHold) { beep(false); var pc = $("pop").querySelector(".pop-card"); pc.classList.remove("shake"); void pc.offsetWidth; pc.classList.add("shake"); return; }
     if (!pk.slips) { pickMsg("bad", code, "伝票を 読み込み中です — 少し 待って もう一度"); beep(false); renderPick(); return; }
     var s = pk.open && slipByKey(pk.open);
     if (!s) {   // 一覧 — その 品番の 伝票を 開く（まだ 終わって いない 方を 先に）
       var hits = pk.slips.filter(function (x) { return x.c === c && x.lines.some(function (l) { return l.id === id; }); });
-      if (!hits.length) { pickMsg("bad", code, "この 日の 伝票に ない 品番です"); beep(false); renderPick(); return; }
+      if (!hits.length) { pickMsg("bad", code, "商品が ちがいます — この 日の 伝票に ない 商品です"); beep(false); renderPick(); return; }
       s = openSlip((hits.filter(function (x) { return slipCount(x) < x.lines.length; })[0] || hits[0]).key);
       window.scrollTo(0, 0);
     }
@@ -963,8 +1065,8 @@
     if (!l) {
       var it = lists[c] && lists[c].items[id];
       var same = it ? s.lines.filter(function (x) { return normName(x.name) === normName(it.name); })[0] : null;
-      pickMsg("bad", code, same ? "ロットが ちがいます — 伝票は " + same.id + "（" + inDay(same.nyukoDate) + " 入庫・" + (same.loc || "場所なし") + "）"
-                               : "この 伝票に ない 品番です" + (it ? "（" + it.name + "）" : ""));
+      pickMsg("bad", code, same ? "入庫日が ちがいます — 同じ 商品の 別の 入庫日です。伝票は " + same.id + "（" + inDay(same.nyukoDate) + " 入庫・" + (same.loc || "場所なし") + "）"
+                               : it ? "商品が ちがいます — 伝票に ない 商品です（" + it.name + "）" : "品番が ちがいます — この 伝票に ない 品番です");
       beep(false); renderPick(); return;
     }
     var had = slipLines(s)[l.id];
@@ -1184,7 +1286,7 @@
 
   // ── 新しい 版が 出ていたら 読み直す（ホーム画面の アプリは 古い 版を しばらく 覚えている）──
   // 開いた 時だけ（カメラを 開いた 後に 読み直すと また 許可を 聞くので）。同じ 版へは 1回だけ（ループ しない）。
-  var VERSION = "2026-11-09g";
+  var VERSION = "2026-11-10b";
   $("verLbl").textContent = "版 " + VERSION;
   function checkUpdate() {
     if (!window.fetch) return;
