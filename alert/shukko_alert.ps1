@@ -24,6 +24,164 @@ if ($Test -and -not $Tid) { $Tid = "t" + (Get-Date -Format "yyyyMMddHHmm") }
 $Base = $Url + "?api=alert&key=" + $Key + "&when=" + $When + "&pcid=" + $Role + $(if ($Tid) { "&tid=" + $Tid } else { "" })
 
 if (-not $Test -and -not $Broadcast -and -not $Watch -and (Get-Date).Hour -ge 18) { Log "skip (late start)"; exit }
+# ── 音を 一番に（2026-11-10 ユーザー「ほかの 音を 止めて お知らせの 音を 優先」）──
+#   音を 出す PC だけ: ほかの アプリ（ラジオ など）を ミュート、PC の 音量を 70% 以上・ミュート 解除。
+#   音が 止まったら（OK・ほかの PC の OK・30分）元に 戻す。落ちても duck.json → 次の 見張り（2分）で 戻す。
+$NkAudioCs = @'
+using System;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
+namespace NkAudio {
+  [ComImport, Guid("BCDE0395-E52F-467C-8E3D-C4579291692E")] class MMDeviceEnumerator {}
+  [ComImport, Guid("A95664D2-9614-4F35-A746-DE8DB63617E6"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+  interface IMMDeviceEnumerator {
+    [PreserveSig] int EnumAudioEndpoints(int dataFlow, int stateMask, out IMMDeviceCollection devices);
+    [PreserveSig] int GetDefaultAudioEndpoint(int dataFlow, int role, out IMMDevice device);
+  }
+  [ComImport, Guid("0BD7A1BE-7A1A-44DB-8397-CC5392387B5E"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+  interface IMMDeviceCollection {
+    [PreserveSig] int GetCount(out int count);
+    [PreserveSig] int Item(int index, out IMMDevice device);
+  }
+  [ComImport, Guid("D666063F-1587-4E43-81F1-B948E807363F"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+  interface IMMDevice {
+    [PreserveSig] int Activate(ref Guid iid, int clsCtx, IntPtr p, [MarshalAs(UnmanagedType.IUnknown)] out object o);
+  }
+  [ComImport, Guid("5CDF2C82-841E-4546-9722-0CF74078229A"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+  interface IAudioEndpointVolume {
+    int F1(); int F2(); int F3(); int F4();
+    [PreserveSig] int SetMasterVolumeLevelScalar(float level, ref Guid ctx);
+    int F6();
+    [PreserveSig] int GetMasterVolumeLevelScalar(out float level);
+    int F8(); int F9(); int F10(); int F11();
+    [PreserveSig] int SetMute([MarshalAs(UnmanagedType.Bool)] bool mute, ref Guid ctx);
+    [PreserveSig] int GetMute([MarshalAs(UnmanagedType.Bool)] out bool mute);
+  }
+  [ComImport, Guid("77AA99A0-1BD6-484F-8BC7-2C654C9A9B6F"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+  interface IAudioSessionManager2 {
+    int F1(); int F2();
+    [PreserveSig] int GetSessionEnumerator(out IAudioSessionEnumerator e);
+  }
+  [ComImport, Guid("E2F5BB11-0570-40CA-ACDD-3AA01277DEE8"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+  interface IAudioSessionEnumerator {
+    [PreserveSig] int GetCount(out int n);
+    [PreserveSig] int GetSession(int i, out IAudioSessionControl2 s);
+  }
+  [ComImport, Guid("bfb7ff88-7239-4fc9-8fa2-07c950be9c6d"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+  interface IAudioSessionControl2 {
+    int F1(); int F2(); int F3(); int F4(); int F5(); int F6(); int F7(); int F8(); int F9();
+    int F10(); int F11();
+    [PreserveSig] int GetProcessId(out uint pid);
+    [PreserveSig] int IsSystemSoundsSession();
+  }
+  [ComImport, Guid("87CE5498-68D6-44E5-9215-6DA47EF883D8"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+  interface ISimpleAudioVolume {
+    [PreserveSig] int SetMasterVolume(float level, ref Guid ctx);
+    [PreserveSig] int GetMasterVolume(out float level);
+    [PreserveSig] int SetMute([MarshalAs(UnmanagedType.Bool)] bool mute, ref Guid ctx);
+    [PreserveSig] int GetMute([MarshalAs(UnmanagedType.Bool)] out bool mute);
+  }
+  public static class Mixer {
+    static Guid IidEv = new Guid("5CDF2C82-841E-4546-9722-0CF74078229A");
+    static Guid IidSm = new Guid("77AA99A0-1BD6-484F-8BC7-2C654C9A9B6F");
+    static Guid G = Guid.Empty;
+    public static List<int> MutedPids = new List<int>();
+    public static int[] Skip = new int[0];
+    static string ListI() {
+      var b = new System.Text.StringBuilder();
+      foreach (var p in Sessions()) { bool mu; float v; p.Value.GetMute(out mu); p.Value.GetMasterVolume(out v); b.Append(p.Key + ":" + (mu ? "M" : "-") + ":" + (int)Math.Round(v * 100) + " "); }
+      return b.ToString().Trim();
+    }
+    public static float OldMaster = -1; public static bool OldMute = false; public static bool MasterChanged = false;
+    // PowerShell は STA — 音の セッションの ISimpleAudioVolume は MTA でしか 取れない → 全部 MTA の スレッドで
+    static T Mta<T>(Func<T> f) {
+      T r = default(T); Exception ex = null;
+      var th = new System.Threading.Thread(() => { try { r = f(); } catch (Exception e) { ex = e; } });
+      th.SetApartmentState(System.Threading.ApartmentState.MTA); th.Start(); th.Join();
+      if (ex != null) throw ex;
+      return r;
+    }
+    public static string List() { return Mta(() => ListI()); }
+    public static string Start(int[] keep, float minVol) { return Mta(() => StartI(keep, minVol)); }
+    public static int Refresh(int[] keep) { return Mta(() => RefreshI(keep)); }
+    public static void End() { Mta(() => { EndI(); return 0; }); }
+    public static void RestorePids(int[] pids, float master, bool mute) { Mta(() => { RestorePidsI(pids, master, mute); return 0; }); }
+    static IMMDeviceEnumerator En() { return (IMMDeviceEnumerator)(new MMDeviceEnumerator()); }
+    static IAudioEndpointVolume Ev() {
+      IMMDevice d; if (En().GetDefaultAudioEndpoint(0, 1, out d) != 0 || d == null) return null;
+      object o; if (d.Activate(ref IidEv, 23, IntPtr.Zero, out o) != 0 || o == null) return null;
+      return (IAudioEndpointVolume)o;
+    }
+    static List<KeyValuePair<int, ISimpleAudioVolume>> Sessions() {
+      var r = new List<KeyValuePair<int, ISimpleAudioVolume>>();
+      IMMDeviceCollection c; if (En().EnumAudioEndpoints(0, 1, out c) != 0 || c == null) return r;
+      int n; c.GetCount(out n);
+      for (int i = 0; i < n; i++) {
+        IMMDevice d; if (c.Item(i, out d) != 0 || d == null) continue;
+        object o; if (d.Activate(ref IidSm, 23, IntPtr.Zero, out o) != 0 || o == null) continue;
+        IAudioSessionEnumerator e; if (((IAudioSessionManager2)o).GetSessionEnumerator(out e) != 0 || e == null) continue;
+        int m; e.GetCount(out m);
+        for (int j = 0; j < m; j++) {
+          IAudioSessionControl2 s; if (e.GetSession(j, out s) != 0 || s == null) continue;
+          if (s.IsSystemSoundsSession() == 0) continue;
+          uint pid; s.GetProcessId(out pid);
+          var v = s as ISimpleAudioVolume; if (v == null || pid == 0) continue;
+          r.Add(new KeyValuePair<int, ISimpleAudioVolume>((int)pid, v));
+        }
+      }
+      return r;
+    }
+    static string StartI(int[] keep, float minVol) {
+      string t = "vol ?";
+      var ev = Ev();
+      if (ev != null) {
+        float l; bool mu; ev.GetMasterVolumeLevelScalar(out l); ev.GetMute(out mu);
+        OldMaster = l; OldMute = mu; MasterChanged = mu || l < minVol;
+        if (mu) ev.SetMute(false, ref G);
+        if (l < minVol) ev.SetMasterVolumeLevelScalar(minVol, ref G);
+        t = "vol " + (int)Math.Round(l * 100) + "%" + (mu ? " muted" : "") + (MasterChanged ? " -> " + (int)Math.Round(Math.Max(l, minVol) * 100) + "%" : "");
+      }
+      RefreshI(keep);
+      return t;
+    }
+    static int RefreshI(int[] keep) {
+      int k = 0;
+      foreach (var p in Sessions()) {
+        if (Array.IndexOf(Skip, p.Key) >= 0) continue;
+        bool mu; p.Value.GetMute(out mu);
+        if (Array.IndexOf(keep, p.Key) >= 0) { if (mu) p.Value.SetMute(false, ref G); p.Value.SetMasterVolume(1f, ref G); continue; }
+        if (!mu) { p.Value.SetMute(true, ref G); if (!MutedPids.Contains(p.Key)) MutedPids.Add(p.Key); k++; }
+      }
+      return k;
+    }
+    static void EndI() { RestorePidsI(MutedPids.ToArray(), MasterChanged ? OldMaster : -1, OldMute); MutedPids.Clear(); MasterChanged = false; }
+    static void RestorePidsI(int[] pids, float master, bool mute) {
+      foreach (var p in Sessions()) if (Array.IndexOf(pids, p.Key) >= 0) p.Value.SetMute(false, ref G);
+      if (master >= 0) { var ev = Ev(); if (ev != null) { ev.SetMasterVolumeLevelScalar(master, ref G); if (mute) ev.SetMute(true, ref G); } }
+    }
+  }
+}
+'@
+$DuckFile = Join-Path $Here "duck.json"
+function AudioLib { if (-not ("NkAudio.Mixer" -as [type])) { Add-Type -TypeDefinition $NkAudioCs -Language CSharp } }
+function SaveDuck {
+  try {
+    $o = @{ owner = $PID; ownerStart = (Get-Process -Id $PID).StartTime.Ticks; pids = @([NkAudio.Mixer]::MutedPids); master = $(if ([NkAudio.Mixer]::MasterChanged) { [NkAudio.Mixer]::OldMaster } else { -1 }); mute = [NkAudio.Mixer]::OldMute }
+    [IO.File]::WriteAllText($DuckFile, ($o | ConvertTo-Json -Compress))
+  } catch {}
+}
+function RestoreLeftover {   # 前の お知らせが 落ちて 戻せなかった → ここで 戻す
+  if (-not (Test-Path $DuckFile)) { return }
+  try {
+    $o = [IO.File]::ReadAllText($DuckFile) | ConvertFrom-Json
+    $p = Get-Process -Id ([int]$o.owner) -ErrorAction SilentlyContinue
+    if ($p -and $p.StartTime.Ticks -eq [int64]$o.ownerStart) { return }
+    AudioLib; [NkAudio.Mixer]::RestorePids([int[]]@($o.pids), [float]$o.master, [bool]$o.mute); Log "audio restored (left over)"
+  } catch { Log ("audio restore error: " + $_.Exception.Message) }
+  Remove-Item $DuckFile -ErrorAction SilentlyContinue
+}
+RestoreLeftover
+
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 function GetJson($u, $sec) {
   $r = Invoke-WebRequest -UseBasicParsing -TimeoutSec $sec -Uri $u
@@ -172,9 +330,44 @@ function StartSound {
   $script:child = Start-Process -FilePath powershell.exe -ArgumentList $a -WindowStyle Hidden -PassThru
   $null = $script:child.Handle
   Log ($When + " sound start")
+  DuckStart
+}
+function VoiceInfo {
+  try {
+    Add-Type -AssemblyName System.Speech; $s = New-Object System.Speech.Synthesis.SpeechSynthesizer
+    $n = @($s.GetInstalledVoices() | Where-Object { $_.Enabled -and $_.VoiceInfo.Culture.Name -eq "ja-JP" } | ForEach-Object { $_.VoiceInfo.Name }); $s.Dispose()
+    if ($n.Count) { $n -join "/" } else { "no ja voice (chime only)" }
+  } catch { "voice ?" }
+}
+$script:ducked = $false; $script:lastDuck = Get-Date
+function DuckStart {
+  if (($Silent -and -not $env:NK_DUCK_TEST) -or $script:ducked -or -not $script:child) { return }
+  $i = ""
+  try {
+    AudioLib; $min = [float]0.7
+    if ($env:NK_DUCK_TEST) { [NkAudio.Mixer]::Skip = [int[]]@($env:NK_DUCK_TEST -split "," | Where-Object { $_ } | ForEach-Object { [int]$_ }); $min = [float]0 }   # テスト用 — ほかの アプリ・音量に 触らない
+    $i = [NkAudio.Mixer]::Start([int[]]@($PID, $script:child.Id), $min); $script:ducked = $true; SaveDuck
+    $nm = @([NkAudio.Mixer]::MutedPids | ForEach-Object { try { (Get-Process -Id $_ -ErrorAction Stop).ProcessName } catch { [string]$_ } }) -join ","
+    $i += "; muted: " + $(if ($nm) { $nm } else { "none" })
+  } catch { $i = "duck error: " + $_.Exception.Message }
+  $i = "voice " + (VoiceInfo) + "; " + $i
+  Log ($When + " audio: " + $i)
+  SendAsync ("poll&info=" + [Uri]::EscapeDataString($(if ($i.Length -gt 280) { $i.Substring(0, 280) } else { $i })))
+}
+function DuckRefresh {   # 3秒ごと — 後から 鳴りだした アプリも ミュート、お知らせの 音は 100%
+  if (-not $script:ducked -or -not $script:child -or ((Get-Date) - $script:lastDuck).TotalSeconds -lt 3) { return }
+  $script:lastDuck = Get-Date
+  try { if ([NkAudio.Mixer]::Refresh([int[]]@($PID, $script:child.Id)) -gt 0) { SaveDuck } } catch {}
+}
+function DuckEnd {
+  if (-not $script:ducked) { return }
+  $script:ducked = $false
+  try { [NkAudio.Mixer]::End(); Log ($When + " audio restored") } catch { Log ("audio restore error: " + $_.Exception.Message) }
+  Remove-Item $DuckFile -ErrorAction SilentlyContinue
 }
 function StopSound {
   if ($script:child) { try { if (-not $script:child.HasExited) { $script:child.Kill() } } catch {}; $script:child = $null; Log ($When + " sound stop") }
+  DuckEnd
 }
 function HmOf($ms) { try { [DateTimeOffset]::FromUnixTimeMilliseconds([int64]$ms).ToLocalTime().ToString("HH:mm") } catch { "" } }
 function Apply($st) {
@@ -191,7 +384,7 @@ $tick = New-Object System.Windows.Threading.DispatcherTimer; $tick.Interval = [T
 $tick.Add_Tick({
   try {
     if ($script:child -and $script:child.HasExited) {
-      $code = $script:child.ExitCode; $script:child = $null
+      $code = $script:child.ExitCode; $script:child = $null; DuckEnd
       if ($code -eq 3) { $script:failed = $true; Log ($When + " sound failed, next PC"); SendAsync "fail"; $foot.Text = "この PC は 音が 出せません — 次の PC に まかせます" }
       else { $script:soundDone = $true }
     }
@@ -203,6 +396,7 @@ $tick.Add_Tick({
       $script:lastPoll = Get-Date; $script:pend = (NewWc).DownloadStringTaskAsync($Base + "&act=poll")
     }
     if ($script:child -and ((Get-Date) - $script:lastOk).TotalSeconds -gt 60) { StopSound }   # サーバーに 届かない → 次の PC に まかせる
+    DuckRefresh
     if (((Get-Date) - $started).TotalMinutes -ge $MaxMin + 1) { $tick.Stop() }
   } catch { Log ("tick error: " + $_.Exception.Message) }
 })
