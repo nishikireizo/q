@@ -338,6 +338,26 @@
   .busy-card { padding: 26px 22px; }
   .spin { width: 56px; height: 56px; margin: 4px auto 14px; border: 6px solid #d6e6e2; border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
+  /* ══ 出庫: 同じ 列・合計・手チェック（2026-11-12）══ */
+  .row-strip { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; background: #fff5cf; border: 2px solid #e8c64a; border-radius: 12px;
+               padding: 10px 12px; font: inherit; font-weight: 700; font-size: 15px; color: #5c4600; margin: 0 0 10px; cursor: pointer; }
+  .row-strip span { margin-left: auto; font-size: 13px; }
+  .pl.hand .pl-st { background: #8a6d00; border-color: #8a6d00; font-size: 12px; }
+  #popX:empty { display: none; }
+  #pop .pop-card { max-height: 94vh; overflow-y: auto; }
+  .px { text-align: left; border-radius: 12px; padding: 9px 11px; margin-top: 10px; font-size: 14px; line-height: 1.55; }
+  .px.sum { background: var(--accent-bg); }
+  .px.same { background: #fff5cf; border: 2px solid #e8c64a; }
+  .px-h { font-size: 12px; font-weight: 700; color: #6b7280; }
+  .px b { font-size: 16px; }
+  .hand-card { border-color: #8a6d00; }
+  .pop-btns .hand-go { background: #8a6d00; border-color: #8a6d00; color: #fff; }
+  .rl-list { max-height: 55vh; overflow-y: auto; text-align: left; margin: 10px 0 4px; }
+  .rl-it { border: 1px solid var(--border); border-radius: 12px; padding: 9px 11px; margin-top: 8px; }
+  .rl-it.here { border: 2px solid var(--blue); background: var(--blue-bg); }
+  .rl-top { display: flex; gap: 8px; align-items: baseline; }
+  .rl-top span { margin-left: auto; font-weight: 800; font-size: 17px; white-space: nowrap; }
+  .rl-who { font-size: 13px; color: #6b7280; }
   /* ══ スキャン結果の ポップアップ ══ */
   .pop { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; padding: 20px;
          background: rgba(20, 40, 35, .45); }
@@ -488,13 +508,22 @@
     </div>
     <div id="pop" class="pop hidden" role="alertdialog" aria-live="assertive">
       <div class="pop-card"><div class="pop-ic" id="popIc"></div><div class="pop-code" id="popCode"></div>
-        <div class="pop-t" id="popT"></div><div class="pop-s" id="popS"></div>
+        <div class="pop-t" id="popT"></div><div class="pop-s" id="popS"></div><div id="popX"></div>
         <button type="button" class="primary pop-ok" id="popOk">OK</button></div>
     </div>
     <div id="shipAsk" class="pop ask hidden" role="dialog">
       <div class="pop-card"><div class="pop-ic">🚚</div><div class="pop-t">出庫を 確定しますか？</div><div class="pop-s" id="shipS"></div>
         <div class="lines-mini" id="shipL"></div>
         <div class="pop-btns"><button type="button" id="shipNo">もどる</button><button type="button" class="go" id="shipGo">確定する</button></div></div>
+    </div>
+    <div id="handAsk" class="pop ask hidden" role="dialog">
+      <div class="pop-card hand-card"><div class="pop-t" id="handT"></div><div class="pop-s" id="handS"></div>
+        <div class="pop-btns"><button type="button" id="handNo">やめる</button><button type="button" class="go hand-go" id="handYes">確かめた ✓</button></div></div>
+    </div>
+    <div id="rowList" class="pop ask hidden" role="dialog">
+      <div class="pop-card"><div class="pop-t" id="rowListT"></div><div class="pop-s">きょうの 伝票 ぜんぶ（出庫済みは 除く）</div>
+        <div class="rl-list" id="rowListL"></div>
+        <div class="pop-btns"><button type="button" id="rowListX">閉じる</button></div></div>
     </div>
     <div id="slipAsk" class="pop ask hidden" role="dialog">
       <div class="pop-card"><div class="pop-t">どの 伝票ですか？</div><div class="pop-s" id="slipAskS"></div>
@@ -1404,10 +1433,10 @@
   function normName(s) { return normalize(s).toLowerCase(); }
   function slipByKey(k) { return (pk.slips || []).filter(function (s) { return s.key === k; })[0] || null; }
   function unitOf(c, id) { var it = lists[c] && lists[c].items[id]; return (it && it.nishikata) || ""; }
-  function pickMsg(kind, code, text, line) { pk.msg = { kind: kind, code: code, text: text, line: line || "" }; if (mode === "shukko") showPop(kind, code, text); }
+  function pickMsg(kind, code, text, line, extra) { pk.msg = { kind: kind, code: code, text: text, line: line || "" }; if (mode === "shukko") showPop(kind, code, text, extra); }
   // ══ スキャン結果の ポップアップ — ✓ は 自動で 消える、✕（ちがう）と ⚠（もう 済み・古い ロット）は OK を 押すまで ══
   var popTimer = null, popHold = false;
-  function showPop(kind, code, text) {
+  function showPop(kind, code, text, extra) {
     var i = text.indexOf(" — "), t = i < 0 ? text : text.slice(0, i), sub = i < 0 ? "" : text.slice(i + 3);
     clearTimeout(popTimer);
     $("pop").className = "pop " + kind;
@@ -1415,7 +1444,8 @@
     $("popCode").textContent = code || "";
     $("popT").textContent = t.replace(/^✓ /, "");
     $("popS").textContent = sub;
-    popHold = kind !== "ok";
+    $("popX").innerHTML = extra || "";
+    popHold = kind !== "ok" || !!extra;   // 合計・同じ 列が ある 時は OK を 押すまで
     $("popOk").classList.toggle("hidden", !popHold);
     if (!popHold) popTimer = setTimeout(hidePop, 1300);
   }
@@ -1593,10 +1623,11 @@
       (sh ? '<div class="shipped"><div>🚚 出庫 済み<small>' + (sh.at ? hhmm(sh.at) + " " : "") + esc(sh.by || "") + " が 確定" + (sh.wait ? "・未送信" : "") + '</small></div><button type="button" data-pk="unship">確定を 取り消す</button></div>'
         : ok ? '<div class="ld"><div class="ld-t">✓ ピッキング 完了 — 積み込み待ち</div><div class="ld-s">トラックに 積んだら 押す → 出庫 確定。押すまで 出庫済みに なりません。' +
           (took ? "（" + Math.floor(took / 60) + "分" + (took % 60) + "秒）" : "") + '</div><button type="button" class="ld-btn" data-pk="ship">🚚 トラックに 積んだ</button></div>' : "") +
+      (sh ? "" : rowStrips(s)) +
       '<div class="pane active pk-lines"><div class="sec-head">場所の 順・ラベルを 読むと ✓</div>' +
       lines.map(function (l) {
         var d = m[l.id], old = olderLots(s, l), u = unitOf(s.c, l.id);
-        return '<div class="pl' + (d ? " ok" : "") + (sh ? " gone" : "") + (pk.msg && pk.msg.line === l.id ? " last" : "") + '" data-line="' + esc(l.id) + '">' +
+        return '<div class="pl' + (d ? " ok" : "") + (d && d.hand ? " hand" : "") + (sh ? " gone" : "") + (pk.msg && pk.msg.line === l.id ? " last" : "") + '" data-line="' + esc(l.id) + '">' +
           '<div class="pl-loc">' + esc(l.loc || "—") + "</div>" +
           '<div class="pl-main"><div class="pl-id">' + esc(l.id) + (l.yoyaku ? ' <span class="kr-tag yy">予約</span>' : "") + "</div>" +
             '<div class="pl-name">' + esc(l.name) + "</div>" +
@@ -1606,7 +1637,7 @@
               esc(old[0].location || "場所なし") + "・在庫 " + realStock(old[0]) + "）" + (old.length > 1 ? " ほか " + (old.length - 1) : "") + "</div>" : "") +
           "</div>" +
           '<div class="pl-qty"><b>' + esc(l.qty) + "</b><span>" + esc(u) + "</span></div>" +
-          '<div class="pl-st">' + (d ? "✓" : "") + "</div></div>";
+          '<div class="pl-st">' + (d ? (d.hand ? "手" : "✓") : "") + "</div></div>";
       }).join("") +
       '<div class="pk-foot"><button type="button" class="link" data-pk="reset">この 伝票の チェックを やり直す</button></div></div>';
   }
@@ -1616,6 +1647,7 @@
   function pickScan(c, id, key) {
     var code = c + "-" + id;
     if (!key && !$("slipAsk").classList.contains("hidden")) { beep(false); return; }   // 選ぶ 画面が 出て いる 間は 読まない
+    if (!$("handAsk").classList.contains("hidden") || !$("rowList").classList.contains("hidden")) { beep(false); return; }
     if (popHold) { beep(false); var pc = $("pop").querySelector(".pop-card"); pc.classList.remove("shake"); void pc.offsetWidth; pc.classList.add("shake"); return; }
     if (!pk.slips) { pickMsg("bad", code, "伝票を 読み込み中です — 少し 待って もう一度"); beep(false); renderPick(); return; }
     var s = key ? openSlip(key) : (pk.open && slipByKey(pk.open));
@@ -1643,13 +1675,86 @@
     var old = olderLots(s, l);
     queuePick(s, l.id, true, false);
     pickMsg(old.length ? "warn" : "ok", code, "✓ " + l.name + " " + l.qty + " " + unitOf(c, l.id) +
-      (old.length ? " — ⚠ もっと 古い ロット " + old[0].number + "（" + inDay(old[0].nyukoDate) + "・" + (old[0].location || "場所なし") + "）が あります" : ""), l.id);
+      (old.length ? " — ⚠ もっと 古い ロット " + old[0].number + "（" + inDay(old[0].nyukoDate) + "・" + (old[0].location || "場所なし") + "）が あります" : ""), l.id, pickExtra(s, l));
     beep(true); renderPick();
   }
 
+  // ══ 同じ 列（棚）・きょうの 合計・手チェック（2026-11-12）══
+  //   列 = 5・6・7 は 部屋＋文字（7A・5R'）、8 は 2けた（81〜87）
+  var HAND_CONFIRM = true;   // QR なし の 手チェックで「目で 確かめましたか？」を 出す。要らなく なったら false（前の 確認だけに 戻る）
+  function rowsOf(loc) {
+    var t = normalize(String(loc || "")).toUpperCase().replace(/[’′‘`]/g, "'"), out = [], m, re = /(8[1-7])|([567])\s*([A-Z])\s*('?)/g;
+    while ((m = re.exec(t))) { var k = m[1] || (m[2] + m[3] + m[4]); if (out.indexOf(k) < 0) out.push(k); }
+    return out;
+  }
+  // その 列で まだ ✓ して いない 行（きょうの 伝票 ぜんぶ・出庫済みは 除く）
+  function rowTodo(row) {
+    var out = [];
+    (pk.slips || []).forEach(function (x) {
+      if (shipped(x)) return;
+      var m = slipLines(x);
+      x.lines.forEach(function (l) { if (!m[l.id] && rowsOf(l.loc).indexOf(row) >= 0) out.push({ s: x, l: l }); });
+    });
+    return out;
+  }
+  function rowStrips(s) {
+    var rows = [];
+    s.lines.forEach(function (l) { rowsOf(l.loc).forEach(function (r) { if (rows.indexOf(r) < 0) rows.push(r); }); });
+    return rows.sort(function (a, b) { return locKey(a) < locKey(b) ? -1 : 1; }).map(function (r) {
+      var n = rowTodo(r).filter(function (o) { return o.s.key !== s.key; }).length;
+      return n ? '<button type="button" class="row-strip" data-row="' + esc(r) + '">📍 ' + esc(r) + " で ほかの 伝票に まだ " + n + " 件<span>見る ›</span></button>" : "";
+    }).join("");
+  }
+  function openRowList(row) {
+    var s = pk.open && slipByKey(pk.open), list = rowTodo(row);
+    $("rowListT").textContent = "📍 " + row + " — まだ 取って いない もの";
+    $("rowListL").innerHTML = list.length ? list.map(function (o) {
+      var here = s && o.s.key === s.key;
+      return '<div class="rl-it' + (here ? " here" : "") + '"><div class="rl-top"><b>' + esc(o.l.name) + "</b><span>" + esc(o.l.qty) + " " + esc(unitOf(o.s.c, o.l.id)) + "</span></div>" +
+        '<div class="rl-who">' + (here ? "この 伝票 — " : esc(o.s.time || "—") + " ") + esc(o.s.client) + (o.s.tantou ? "・" + esc(o.s.tantou) : "") + "・" + esc(o.l.loc || "") + "</div></div>";
+    }).join("") : '<div class="hint">ありません</div>';
+    $("rowList").classList.remove("hidden");
+  }
+  $("rowListX").addEventListener("click", function () { $("rowList").classList.add("hidden"); focusScan(); });
+  // ✓ の あとに 出す もの — きょうの 合計（同じ 商品名が ほかの 伝票にも ある 時）・同じ 列で ほかに 取る もの
+  function pickExtra(s, l) {
+    var nm = normName(l.name), parts = [], tot = 0, html = "";
+    (pk.slips || []).forEach(function (x) {
+      if (x.key !== s.key && shipped(x)) return;
+      x.lines.forEach(function (y) { if (normName(y.name) === nm) { tot += parseFloat(y.qty) || 0; parts.push({ who: x.tantou || x.client, q: y.qty }); } });
+    });
+    if (parts.length > 1) html += '<div class="px sum"><div class="px-h">きょう この 商品の 合計</div><b>' + esc(tot) + "</b> " + esc(unitOf(s.c, l.id)) + " ＝ " +
+      parts.map(function (p) { return esc(p.who) + " " + esc(p.q); }).join(" ＋ ") + "</div>";
+    var rows = rowsOf(l.loc), seen = {}, other = [];
+    rows.forEach(function (r) { rowTodo(r).forEach(function (o) { var k = o.s.key + "|" + o.l.id; if (seen[k] || (o.s.key === s.key && o.l.id === l.id)) return; seen[k] = 1; other.push(o); }); });
+    if (other.length) html += '<div class="px same"><div class="px-h">📍 ' + esc(rows.join("・")) + " で ほかに 取る もの</div>" + other.slice(0, 6).map(function (o) {
+      return esc(o.l.name) + " <b>" + esc(o.l.qty) + "</b> → " + (o.s.key === s.key ? "この 伝票" : esc(o.s.tantou || o.s.client));
+    }).join("<br>") + (other.length > 6 ? "<br>… ほか " + (other.length - 6) + " 件" : "") + "</div>";
+    return html;
+  }
+  // QR なし — 目で 確かめて ✓（手）
+  function askHand(s, id) {
+    var l = s.lines.filter(function (x) { return x.id === id; })[0]; if (!l) return;
+    $("handT").textContent = l.name + " × " + l.qty + " " + unitOf(s.c, id);
+    $("handS").textContent = id + "・" + (l.loc || "場所なし") + " — QR が ありません。商品と 数を 目で 確かめましたか？";
+    $("handAsk").dataset.key = s.key; $("handAsk").dataset.id = id;
+    $("handAsk").classList.remove("hidden");
+  }
+  $("handNo").addEventListener("click", function () { $("handAsk").classList.add("hidden"); focusScan(); });
+  $("handYes").addEventListener("click", function () {
+    var d = $("handAsk").dataset, s = slipByKey(d.key);
+    $("handAsk").classList.add("hidden");
+    if (!s || shipped(s) || slipLines(s)[d.id]) { renderPick(); focusScan(); return; }
+    var l = s.lines.filter(function (x) { return x.id === d.id; })[0];
+    queuePick(s, d.id, true, true); beep(true);
+    pickMsg("ok", s.c + "-" + d.id, "✓ " + l.name + " " + l.qty + " " + unitOf(s.c, d.id) + "（手）", d.id, pickExtra(s, l));
+    renderPick(); focusScan();
+  });
+
   $("pickView").addEventListener("click", function (e) {
-    var b = e.target.closest("[data-pk], [data-slip], [data-line]"); if (!b) return;
+    var b = e.target.closest("[data-pk], [data-slip], [data-line], [data-row]"); if (!b) return;
     var a = b.getAttribute("data-pk"), s = pk.open && slipByKey(pk.open);
+    if (b.hasAttribute("data-row")) { openRowList(b.getAttribute("data-row")); return; }
     if (b.hasAttribute("data-slip")) { openSlip(b.getAttribute("data-slip")); renderPick(); window.scrollTo(0, 0); }
     else if (a === "prev" || a === "next") { pk.date = dayShift(pk.date, a === "prev" ? -1 : 1); pk.open = ""; pk.msg = null; loadSlips(); }
     else if (a === "reload") { pk.msg = null; loadSlips(); }
@@ -1672,6 +1777,7 @@
     } else if (b.hasAttribute("data-line") && s) {   // ラベルが 読めない 時は 手で
       var id = b.getAttribute("data-line"), d = slipLines(s)[id];
       if (d) { if (!confirm(id + " の チェックを 外しますか？")) return; queuePick(s, id, false, true); }
+      else if (HAND_CONFIRM) { askHand(s, id); return; }
       else { if (!confirm(id + " を 手で チェック しますか？（ラベルが 読めない 時だけ）")) return; queuePick(s, id, true, true); }
       pk.msg = null; renderPick();
     }
@@ -2165,7 +2271,7 @@
 
   // ── 新しい 版が 出ていたら 読み直す（ホーム画面の アプリは 古い 版を しばらく 覚えている）──
   // 開いた 時だけ（カメラを 開いた 後に 読み直すと また 許可を 聞くので）。同じ 版へは 1回だけ（ループ しない）。
-  var VERSION = "2026-11-12h";
+  var VERSION = "2026-11-12i";
   $("verLbl").textContent = "版 " + VERSION;
   function checkUpdate() {
     if (!window.fetch) return;
