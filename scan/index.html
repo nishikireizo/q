@@ -306,6 +306,7 @@
   .lbl-style button.active[data-lst="iriko"] { background: #fbd94f; border-color: #e0b800; color: #5c4600; }
   .lbl-wrap { position: relative; overflow: hidden; margin: 10px 0 12px; border: 2px solid #ccc; border-radius: 8px; background: #fff; min-height: 60px; }
   .lbl-go { width: 100%; padding: 14px; font-size: 17px; border-radius: 14px; }
+  .lbl-hint { margin-top: 6px; font-size: 12px; color: var(--muted); text-align: center; }
   .lbl-page { width: 1047px; height: 718px; transform-origin: 0 0; display: flex; flex-direction: column; padding: 8px 11px; box-sizing: border-box;
               overflow: hidden; background: #fff; color: #000; font-family: "Noto Sans JP", sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .lbl-page .lt { display: flex; align-items: center; gap: 2%; flex: 0 0 24%; min-height: 0; }
@@ -1276,7 +1277,7 @@
     if (b.hasAttribute("data-tab")) setTab(b.getAttribute("data-tab"));
     else if (b.id === "locEdit") openLocEdit(c, id);
     else if (b.id === "openPage") setTab("label");
-    else if (b.id === "lblPrint") { printLabel(); return; }
+    else if (b.id === "lblPrint") { shareOrPrintLabel(); return; }
     else if (b.hasAttribute("data-lst")) { lblStyle = b.getAttribute("data-lst"); drawLabel(c, id, cardItem); }
     else if (b.id === "refreshBtn") showItem(c, id, true);
     else return;
@@ -1817,7 +1818,7 @@
   //   ラベルは 277mm × 190mm（1047 × 718 px）で 作って、画面では 小さく 見せる。印刷も 同じ もの。
   var QR_SRC = "https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js";
   var QR_SRI = "sha384-3zSEDfvllQohrq0PHL1fOXJuC/jSOO34H46t6UQfobFOmxE5BpjjaIJY5F2/bMnU";
-  var LBL_W = 1047, LBL_H = 718, qrLoading = null, lblStyle = "normal", lblSeq = 0, lblCode = "";
+  var LBL_W = 1047, LBL_H = 718, qrLoading = null, lblStyle = "normal", lblSeq = 0, lblCode = "", lblFile = null;
   function loadQR() {
     if (window.QRCode) return Promise.resolve();
     if (qrLoading) return qrLoading;
@@ -1839,7 +1840,8 @@
     return '<div class="pane' + (tab === "label" ? " active" : "") + '" data-pane="label"><div class="sec-head">ラベル印刷（A4 横・1枚）</div>' +
       (String(c) === "27" ? '<div class="lbl-style" id="lblStyle"><button type="button" data-lst="normal">通常</button><button type="button" data-lst="iriko">⚠ いりこ用</button></div>' : "") +
       '<div class="lbl-wrap" id="lblWrap"><div class="empty-msg">ラベルを 作って います…</div></div>' +
-      '<button type="button" class="primary lbl-go" id="lblPrint" disabled>🖨 ラベル印刷</button></div>';
+      '<button type="button" class="primary lbl-go" id="lblPrint" disabled>🖨 ラベル印刷</button>' +
+      (canShareFiles() ? '<div class="lbl-hint">共有 → 「Canon PRINT」を 選ぶ（A4 横・1枚の PDF）</div>' : "") + "</div>";
   }
   function labelHtml(c, id, it, qr) {
     c = String(c);
@@ -1896,15 +1898,97 @@
     if (c + "-" + id !== lblCode) { lblCode = c + "-" + id; lblStyle = "normal"; }   // 別の 商品は 通常から
     syncLblStyle();
     if ($("lblPrint")) $("lblPrint").disabled = true;
+    lblFile = null;
     loadQR().then(function () {
       if (!live()) return;
       wrap.innerHTML = '<div class="lbl-page" id="lblPage">' + labelHtml(c, id, it, qrData(c + "-" + id)) + "</div>";
       fitLabel(c); scaleLabel();
-      if ($("lblPrint")) $("lblPrint").disabled = false;
-      if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { if (live()) { fitLabel(c); scaleLabel(); } });
+      if (!canShareFiles() && $("lblPrint")) $("lblPrint").disabled = false;
+      var done = function () {
+        if (!live()) return;
+        fitLabel(c); scaleLabel();
+        if (!canShareFiles()) return;
+        labelPdf(c + "-" + id).then(function (file) { if (live()) { lblFile = file; if ($("lblPrint")) $("lblPrint").disabled = false; } })
+          .catch(function () { if (live() && $("lblPrint")) $("lblPrint").disabled = false; });   // PDF が 作れない 時は 今までの 印刷
+      };
+      if (document.fonts && document.fonts.ready) document.fonts.ready.then(done); else done();
     }).catch(function (e) {
       if (live()) wrap.innerHTML = '<div class="empty-msg">ラベルを 作れませんでした — 電波を 確かめて、もう一度 タブを 押して ください（' + esc((e && e.message) || e) + "）</div>";
     });
+  }
+  // ── PDF（A4 横・1枚）— 画面の ラベルを そのまま 絵に して 入れる。共有 → Canon PRINT など ──
+  function canShareFiles() {
+    try { return !!(navigator.share && navigator.canShare && window.File && navigator.canShare({ files: [new File(["x"], "t.pdf", { type: "application/pdf" })] })); } catch (e) { return false; }
+  }
+  function labelCanvas() {
+    var pg = $("lblPage"), pr = pg.getBoundingClientRect(), k = pr.width / LBL_W, S = 3;
+    var cv = document.createElement("canvas"); cv.width = LBL_W * S; cv.height = LBL_H * S;
+    var x = cv.getContext("2d");
+    x.fillStyle = "#fff"; x.fillRect(0, 0, cv.width, cv.height);
+    x.setTransform(S / k, 0, 0, S / k, -pr.left * S / k, -pr.top * S / k);   // 画面の 位置で 描く
+    Array.prototype.forEach.call(pg.querySelectorAll(".lr"), function (e) { var q = e.getBoundingClientRect(); x.fillStyle = "#000"; x.fillRect(q.left, q.top, q.width, q.height); });
+    x.imageSmoothingEnabled = false;
+    Array.prototype.forEach.call(pg.querySelectorAll(".lq img"), function (e) { var q = e.getBoundingClientRect(); x.drawImage(e, q.left, q.top, q.width, q.height); });
+    var tw = document.createTreeWalker(pg, NodeFilter.SHOW_TEXT, null), node, rg = document.createRange();
+    while ((node = tw.nextNode())) {
+      var cs = getComputedStyle(node.parentNode), t = node.nodeValue;
+      x.font = cs.fontWeight + " " + (parseFloat(cs.fontSize) * k) + "px " + cs.fontFamily;
+      x.fillStyle = cs.color; x.textBaseline = "alphabetic";
+      for (var i = 0; i < t.length; i++) {
+        var n = (t.charCodeAt(i) >= 0xD800 && t.charCodeAt(i) < 0xDC00) ? 2 : 1, ch = t.substr(i, n);
+        if (!/\S/.test(ch.replace(/\u00a0/g, " "))) { i += n - 1; continue; }
+        rg.setStart(node, i); rg.setEnd(node, i + n);
+        var q = rg.getClientRects()[0]; i += n - 1;
+        if (!q || !q.width) continue;
+        var m = x.measureText(ch), asc = m.fontBoundingBoxAscent, dsc = m.fontBoundingBoxDescent;
+        var base = (asc != null && dsc != null) ? q.top + (q.height - asc - dsc) / 2 + asc : q.top + q.height * 0.86;
+        x.fillText(ch, q.left, base);
+      }
+    }
+    return cv;
+  }
+  // JPEG 1枚を A4 横（842 × 595pt）の 真ん中に 277 × 190mm で 置いた PDF
+  function jpegPdf(jpg, w, h) {
+    var enc = function (str) { var a = new Uint8Array(str.length); for (var i = 0; i < str.length; i++) a[i] = str.charCodeAt(i) & 255; return a; };
+    var parts = [], len = 0, offs = [];
+    var add = function (p) { if (typeof p === "string") p = enc(p); parts.push(p); len += p.length; };
+    var obj = function (n, body, stream) { offs[n] = len; add(n + " 0 obj\n" + body); if (stream) { add("stream\n"); add(stream); add("\nendstream"); } add("\nendobj\n"); };
+    var cmd = "q 785.20 0 0 538.58 28.35 28.35 cm /Im0 Do Q";
+    add("%PDF-1.4\n");
+    obj(1, "<< /Type /Catalog /Pages 2 0 R >>");
+    obj(2, "<< /Type /Pages /Kids [3 0 R] /Count 1 >>");
+    obj(3, "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 841.89 595.28] /Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>");
+    obj(4, "<< /Type /XObject /Subtype /Image /Width " + w + " /Height " + h + " /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length " + jpg.length + " >>\n", jpg);
+    obj(5, "<< /Length " + cmd.length + " >>\n", enc(cmd));
+    var xref = len, x = "xref\n0 6\n0000000000 65535 f \n";
+    for (var i = 1; i <= 5; i++) x += ("0000000000" + offs[i]).slice(-10) + " 00000 n \n";
+    add(x + "trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n" + xref + "\n%%EOF\n");
+    return new Blob(parts, { type: "application/pdf" });
+  }
+  function labelPdf(code) {
+    return new Promise(function (res, rej) {
+      var cv = labelCanvas();
+      cv.toBlob(function (b) {
+        if (!b) return rej(new Error("画像を 作れませんでした"));
+        var fr = new FileReader();
+        fr.onload = function () {
+          var pdf = jpegPdf(new Uint8Array(fr.result), cv.width, cv.height);
+          res(new File([pdf], "label_" + code + ".pdf", { type: "application/pdf" }));
+        };
+        fr.onerror = function () { rej(fr.error); };
+        fr.readAsArrayBuffer(b);
+      }, "image/jpeg", 0.9);
+    });
+  }
+  function shareOrPrintLabel() {
+    if (lblFile && canShareFiles()) {
+      navigator.share({ files: [lblFile] }).catch(function (e) {
+        if (e && e.name === "AbortError") return;   // やめた 時は 何も しない
+        printLabel();
+      });
+      return;
+    }
+    printLabel();
   }
   function printLabel() {
     var pg = $("lblPage"); if (!pg) return;
@@ -2039,7 +2123,7 @@
 
   // ── 新しい 版が 出ていたら 読み直す（ホーム画面の アプリは 古い 版を しばらく 覚えている）──
   // 開いた 時だけ（カメラを 開いた 後に 読み直すと また 許可を 聞くので）。同じ 版へは 1回だけ（ループ しない）。
-  var VERSION = "2026-11-12d";
+  var VERSION = "2026-11-12e";
   $("verLbl").textContent = "版 " + VERSION;
   function checkUpdate() {
     if (!window.fetch) return;
