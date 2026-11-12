@@ -326,11 +326,12 @@
   #lblOut { display: none; }
   @media print {
     @page { size: A4 landscape; margin: 0.5cm; }
-    body.lbl-printing { background: #fff !important; margin: 0 !important; padding: 0 !important; }
+    html, body.lbl-printing { background: #fff !important; margin: 0 !important; padding: 0 !important; }
     body.lbl-printing > :not(#lblOut) { display: none !important; }
     body.lbl-printing #lblOut { display: block; }
     body.lbl-printing #lblOut .lbl-page { width: 277mm; height: 190mm; margin: 0 auto; transform: none !important; }
   }
+
   /* 保存中（場所の 変更）*/
   .busy-card { padding: 26px 22px; }
   .spin { width: 56px; height: 56px; margin: 4px auto 14px; border: 6px solid #d6e6e2; border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; }
@@ -1913,7 +1914,8 @@
     document.body.classList.add("lbl-printing");
     setTimeout(function () { window.print(); }, 60);
   }
-  window.addEventListener("afterprint", function () { document.body.classList.remove("lbl-printing"); });
+  // 印刷画面を 閉じた あと、画面に 触ったら 元に 戻す（afterprint は スマホで すぐ 来て、向きを 変えると 画面 全部が 出て しまう）
+  document.addEventListener("pointerdown", function () { document.body.classList.remove("lbl-printing"); }, true);
   window.addEventListener("resize", scaleLabel);
   function showBusy(t) { $("busyT").textContent = t || "保存中…"; $("busy").classList.remove("hidden"); }
   function hideBusy() { $("busy").classList.add("hidden"); }
@@ -2037,7 +2039,7 @@
 
   // ── 新しい 版が 出ていたら 読み直す（ホーム画面の アプリは 古い 版を しばらく 覚えている）──
   // 開いた 時だけ（カメラを 開いた 後に 読み直すと また 許可を 聞くので）。同じ 版へは 1回だけ（ループ しない）。
-  var VERSION = "2026-11-12c";
+  var VERSION = "2026-11-12d";
   $("verLbl").textContent = "版 " + VERSION;
   function checkUpdate() {
     if (!window.fetch) return;
