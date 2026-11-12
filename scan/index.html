@@ -281,6 +281,16 @@
   .pop.ask .pop-card { border-color: var(--blue); }
   .pop.ask .pop-ic { background: var(--blue); font-size: 64px; }
   .pop.ask .pop-t { color: var(--blue); }
+  /* 同じ 品番が 2枚 以上の 伝票に ある 時 — 伝票を 選ぶ（2026-11-12）*/
+  .slip-pick { display: flex; flex-direction: column; gap: 10px; margin: 12px 0 4px; max-height: 52vh; overflow-y: auto; text-align: left; }
+  .slip-pick button { display: block; width: 100%; text-align: left; background: #fff; border: 2px solid var(--blue); border-radius: 14px; padding: 12px 14px; font: inherit; color: inherit; cursor: pointer; }
+  .slip-pick button:active { background: #eef4ff; }
+  .slip-pick .sp-top { display: flex; align-items: baseline; gap: 8px; font-size: 18px; font-weight: 800; }
+  .slip-pick .sp-top .sp-qty { margin-left: auto; white-space: nowrap; color: var(--blue); }
+  .slip-pick .sp-row { display: flex; gap: 8px; margin-top: 5px; font-size: 15px; line-height: 1.35; }
+  .slip-pick .sp-row span { flex: 0 0 4.2em; color: #6b7280; font-size: 13px; padding-top: 1px; }
+  .slip-pick .sp-row b { font-weight: 700; min-width: 0; overflow-wrap: anywhere; }
+  .slip-pick .sp-prog { margin-top: 6px; font-size: 13px; color: #6b7280; }
   .pop-btns { display: grid; grid-template-columns: 1fr 1.6fr; gap: 10px; margin-top: 18px; }
   .pop-btns button { height: 58px; font-size: 19px; font-weight: 700; border-radius: 14px; }
   .pop-btns .go { background: var(--blue); border-color: var(--blue); color: #fff; }
@@ -444,11 +454,464 @@
         <div class="lines-mini" id="shipL"></div>
         <div class="pop-btns"><button type="button" id="shipNo">もどる</button><button type="button" class="go" id="shipGo">確定する</button></div></div>
     </div>
+    <div id="slipAsk" class="pop ask hidden" role="dialog">
+      <div class="pop-card"><div class="pop-t">どの 伝票ですか？</div><div class="pop-s" id="slipAskS"></div>
+        <div class="slip-pick" id="slipAskL"></div>
+        <div class="pop-btns"><button type="button" id="slipAskNo">やめる</button></div></div>
+    </div>
     <div class="foot"><button type="button" class="link" id="logoutBtn">この 端末の ログインを やめる</button><div class="ver" id="verLbl"></div></div>
   </div>
 </div>
 
 
+<!-- LOCPAD START — 場所の 入力（システムの loc_pad.html と 同じ。直す 時は そちらを 直して 入れ直す）-->
+<style>
+  #lpRoot { position: fixed; left: 0; right: 0; bottom: 0; z-index: 9000; background: #fff; border-top: 3px solid var(--lp-hl, #fbd94f);
+    box-shadow: 0 -12px 40px rgba(29,58,92,.18); transform: translateY(105%); transition: transform .2s ease; max-height: 88vh; overflow-y: auto;
+    font-family: 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', sans-serif; color: var(--lp-ink, #1d3a5c); font-size: 14px; line-height: 1.5; }
+  #lpRoot.open { transform: none; }
+  #lpRoot * { box-sizing: border-box; }
+  #lpRoot .lp-in { max-width: 980px; margin: 0 auto; padding: 12px 16px 14px; }
+  #lpRoot .lp-mono { font-family: 'DM Mono', ui-monospace, monospace; }
+  #lpRoot .lp-top { display: flex; align-items: center; gap: 10px; }
+  #lpRoot .lp-who { flex: 1; min-width: 0; }
+  #lpRoot .lp-who b { font: 700 14px 'DM Mono', ui-monospace, monospace; color: var(--lp-accent, #3f6690); margin-right: 8px; }
+  #lpRoot .lp-who span { font-weight: 500; overflow-wrap: anywhere; }
+  #lpRoot .lp-prog { font-size: 12px; color: #8197b0; white-space: nowrap; }
+  #lpRoot .lp-acts { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+  #lpRoot .lp-acts:empty { display: none; }
+  #lpRoot button { font: inherit; cursor: pointer; }
+  #lpRoot .lp-btn { border: 1px solid #dfe7f0; background: #fff; border-radius: 9px; padding: 6px 12px; color: #4a6f96; font-size: 13px; white-space: nowrap; }
+  #lpRoot .lp-btn:hover { border-color: var(--lp-accent, #3f6690); color: var(--lp-accent, #3f6690); }
+  #lpRoot .lp-btn.yel { background: var(--lp-hl, #fbd94f); border-color: var(--lp-hl-line, #e9c53a); color: #5c4600; font-weight: 700; font-size: 14px; padding: 8px 16px; }
+  #lpRoot .lp-btn.pri { background: var(--lp-accent, #3f6690); border-color: var(--lp-accent, #3f6690); color: #fff; font-weight: 700; }
+  #lpRoot .lp-btn.dis { color: #b8604a; border-color: #ecc3b6; }
+  #lpRoot .lp-btn:disabled { opacity: .45; cursor: default; }
+  #lpRoot .lp-row { display: flex; gap: 8px; margin-top: 10px; align-items: stretch; }
+  #lpRoot .lp-row textarea { flex: 1; min-width: 0; font: 500 20px/1.35 'DM Mono', ui-monospace, monospace; letter-spacing: 1px; border: 2px solid var(--lp-hl-line, #e9c53a); border-radius: 10px;
+    padding: 8px 12px; color: var(--lp-ink, #1d3a5c); background: #fff; outline: none; resize: none; overflow: hidden; }
+  #lpRoot .lp-row textarea:focus { box-shadow: 0 0 0 3px rgba(251,217,79,.35); }
+  #lpRoot .lp-quick { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; align-items: center; }
+  #lpRoot .lp-quick .lp-ql { font-size: 11px; color: #8197b0; margin-right: 2px; }
+  #lpRoot .lp-quick button { border: 1px solid #dfe7f0; background: #f6f9fc; border-radius: 999px; padding: 4px 12px; font: 500 13px 'DM Mono', ui-monospace, monospace; color: var(--lp-ink, #1d3a5c); }
+  #lpRoot .lp-quick button i { font: normal 400 11px 'Noto Sans JP', sans-serif; color: #8197b0; margin-right: 4px; }
+  #lpRoot .lp-quick button.pend { border-color: var(--lp-hl-line, #e9c53a); background: var(--lp-hl-soft, #fff8dc); }
+  #lpRoot .lp-parts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; align-items: center; }
+  #lpRoot .lp-parts:empty { display: none; }
+  #lpRoot .lp-parts button { border: 1px solid #dfe7f0; background: #fff; border-radius: 8px; padding: 3px 10px; font: 500 13.5px 'DM Mono', ui-monospace, monospace; color: var(--lp-ink, #1d3a5c); }
+  #lpRoot .lp-parts button.on { border: 2px solid var(--lp-hl, #fbd94f); background: var(--lp-hl-soft, #fff8dc); }
+  #lpRoot .lp-parts button.raw { color: #8197b0; }
+  #lpRoot .lp-parts .lp-comma { color: #8197b0; font: 500 14px 'DM Mono', ui-monospace, monospace; }
+  #lpRoot .lp-build { margin-top: 8px; display: grid; gap: 6px; }
+  #lpRoot .lp-lbl { font-size: 11px; color: #8197b0; }
+  #lpRoot .lp-keys { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+  #lpRoot .lp-keys button { min-width: 40px; height: 38px; border: 1px solid #dfe7f0; background: #fff; border-radius: 8px; font: 500 15px 'DM Mono', ui-monospace, monospace; color: var(--lp-ink, #1d3a5c); padding: 0 6px; }
+  #lpRoot .lp-keys button.sm { min-width: 34px; height: 34px; font-size: 13.5px; }
+  #lpRoot .lp-keys button.circ { font-size: 18px; }
+  #lpRoot .lp-keys button.on { background: var(--lp-accent, #3f6690); border-color: var(--lp-accent, #3f6690); color: #fff; }
+  #lpRoot .lp-keys button.has { background: var(--lp-accent-soft, #eaf1f8); border-color: var(--lp-accent, #3f6690); color: var(--lp-accent, #3f6690); }
+  #lpRoot .lp-keys button.act { min-width: auto; padding: 0 12px; font: 500 13px 'Noto Sans JP', sans-serif; color: #4a6f96; background: #f6f9fc; }
+  #lpRoot .lp-keys button.act.on { background: var(--lp-accent-soft, #eaf1f8); color: var(--lp-accent, #3f6690); border-color: var(--lp-accent, #3f6690); }
+  #lpRoot .lp-keys button:disabled { opacity: .35; cursor: default; }
+  #lpRoot .lp-keys .lp-sep { width: 10px; }
+  #lpRoot .lp-keys .lp-br { flex-basis: 100%; height: 0; }
+  #lpRoot .lp-dim { font-size: 12px; color: #8197b0; }
+  #lpRoot .lp-foot { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 12px; color: #8197b0; flex-wrap: wrap; }
+  #lpRoot .lp-grow { flex: 1; }
+  @media (max-width: 719px) { #lpRoot .lp-keys button { min-width: 38px; height: 40px; } #lpRoot .lp-in { padding: 10px 12px 12px; } }
+  /* 右から出る形（LocPad.setSide(true)）— 確認の窓（z 1000）より下 */
+  #lpRoot.side { top: 0; left: auto; z-index: 900; width: var(--lp-side-w, min(560px, 100vw)); max-height: none; border-top: none; border-left: 3px solid var(--lp-hl, #fbd94f);
+    box-shadow: -6px 0 24px rgba(29,58,92,.14); transform: translateX(105%); visibility: hidden; transition: transform .2s ease-out, visibility 0s linear .2s; }
+  #lpRoot.side.open { transform: none; visibility: visible; transition: transform .2s ease-out, visibility 0s; }
+  #lpRoot.side .lp-in { max-width: none; padding: 0 18px 20px; }
+  #lpRoot.side .lp-head { position: sticky; top: 0; z-index: 2; background: #fff; padding: 16px 0 10px; border-bottom: 1px solid #edf1f5; }
+  #lpRoot.side .lp-top { align-items: flex-start; }
+  #lpRoot.side .lp-who b { display: block; font-size: 20px; margin: 0 0 2px; }
+  #lpRoot.side .lp-who span { font-size: 15px; }
+  #lpRoot.side .lp-keys button { min-width: 44px; height: 42px; }
+  #lpRoot.side .lp-keys button.sm { min-width: 38px; height: 38px; }
+  /* 商品の数など（info）— 名前の下に 1行 */
+  #lpRoot .lp-info { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; margin-top: 6px; font-size: 13px; color: #6f86a0; }
+  #lpRoot .lp-i em { font-style: normal; margin-right: 5px; }
+  #lpRoot .lp-i strong { font: 700 15px 'DM Mono', ui-monospace, monospace; color: var(--lp-ink, #1d3a5c); }
+  #lpRoot .lp-i.big strong { font-size: 19px; color: var(--lp-accent, #3f6690); }
+</style>
+<script>
+(function() {
+  var ROOMS = ["5", "6", "7", "81", "82", "83", "84", "85", "86", "87"];
+  var LANES_8 = "ABCDEFGHIJKLMN".split("");             // 81〜87 の列・（ ）の中の文字
+  var LANES_7 = "ABCDEFGHIJKLMNOPQRSTUVWX".split("");   // 7 の列は A〜X
+  var SECS_7 = [1, 2, 3, 4, 5];                         // 7 の ①〜⑤
+  var POS_NUM = ["1", "2", "3", "4"];
+  var CIRC = "①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳";
+  var esc = function(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function(c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); };
+  var circ = function(n) { return CIRC.charAt(n - 1) || String(n); };
+  var circNum = function(ch) { return CIRC.indexOf(ch) + 1; };
+  var show = function(v) { return String(v).replace(/\n/g, " ↵ "); };   // 2行の場所を 1行で見せる
+
+  // ── 場所の形 ──
+  //  場所 = 行 ↵ 行 …   行 = 部分 , 部分 …
+  //  部分 = 81〜87（と 5・6）＋ 列（A〜Z ＋（数字 か 文字 を , で））…   例 84A(2,3)F(E)
+  //       = 7 ＋ 列（A〜Z ＋ ①〜⑳ ＋ 番号（1,2 / 1-4））…            例 7F④1⑤1,2
+  //  打った文字は O〜Z も読む（ボタンは 8x が A〜N・7 が A〜X）。形に合わない部分は そのまま（raw）
+  var RE8 = /^(8[1-7]|[56])((?:[A-Z](?:\([0-9A-Z,]*\))?)*)$/;
+  var RE7 = /^7((?:[A-Z](?:[①-⑳][0-9,\-]*)*)*)$/;
+  // 続きの行 — 改行の後の「M(1)」のような 部屋の無い 列だけの部分 = 上の 部屋（81〜87・7）の続き。p.cont = その部屋（文字には 書かない）
+  var RE8L = /^(?:[A-Z](?:\([0-9A-Z,]*\))?)+$/;
+  var RE7L = /^(?:[A-Z](?:[①-⑳][0-9,\-]*)+)+$/;
+  function roomOf(p) { return p ? (p.room || p.cont || "") : ""; }
+  function contRoom(p) { var r = roomOf(p); return p && p.raw == null && (r === "7" || r.length === 2) ? r : ""; }   // 次の行が 続けられる部屋
+  // 1行を 部分に — （ ）の中の , は切らない。7 の「③1,2」の ,2 も 前の部分の続き（5・6・7・81〜87 だけなら 新しい部屋）
+  function splitLine(v) {
+    var raw = [], depth = 0, cur = "";
+    for (var i = 0; i < v.length; i++) {
+      var ch = v[i];
+      if (ch === "(") depth++; else if (ch === ")") depth = Math.max(0, depth - 1);
+      if (ch === "," && depth === 0) { raw.push(cur); cur = ""; } else cur += ch;
+    }
+    raw.push(cur);
+    var out = [];
+    raw.forEach(function(t) {
+      var prev = out[out.length - 1];
+      if (prev != null && /[①-⑳][0-9,\-]*$/.test(prev) && /^\d+(-\d+)?$/.test(t) && !/^(5|6|7|8[1-7])$/.test(t)) out[out.length - 1] = prev + "," + t;
+      else out.push(t);
+    });
+    return out;
+  }
+  function posParse7(s) {
+    var out = [];
+    String(s || "").split(",").forEach(function(t) {
+      var m = /^(\d+)-(\d+)$/.exec(t);
+      if (m) { var a = +m[1], b = +m[2], lo = Math.min(a, b), hi = Math.max(a, b); for (var k = lo; k <= hi && k - lo < 50; k++) out.push(String(k)); }
+      else if (t !== "") out.push(t);
+    });
+    return out.filter(function(x, i) { return out.indexOf(x) === i; });
+  }
+  // ctx = 上の 部屋（続きの行を 読む時）
+  function parsePart(s, ctx) {
+    if (ctx && (ctx === "7" ? RE7L : RE8L).test(s)) { var pc = parsePart(ctx + s); if (pc.raw == null) { pc.room = ""; pc.cont = ctx; return pc; } }
+    var m7 = RE7.exec(s);
+    if (m7) {
+      var lanes7 = [], re7 = /([A-Z])((?:[①-⑳][0-9,\-]*)*)/g, k7;
+      while ((k7 = re7.exec(m7[1]))) {
+        var secs = [], rs = /([①-⑳])([0-9,\-]*)/g, q;
+        while ((q = rs.exec(k7[2]))) secs.push({ c: circNum(q[1]), pos: posParse7(q[2]) });
+        lanes7.push({ L: k7[1], secs: secs });
+      }
+      return { room: "7", lanes: lanes7 };
+    }
+    var m = RE8.exec(s);
+    if (!m || (m[1].length === 1 && m[2])) return { raw: s };   // 5・6 は 部屋だけ（5A(1) などは 打ったまま）
+    var lanes = [], re = /([A-Z])(?:\(([0-9A-Z,]*)\))?/g, k;
+    while ((k = re.exec(m[2]))) lanes.push({ L: k[1], pos: k[2] ? k[2].split(",").filter(Boolean) : [] });
+    return { room: m[1], lanes: lanes };
+  }
+  // そろえる: 全角→半角・小文字→大文字・「、，」→「,」（①〜⑳ は NFKC で「1」にならないように 守る）。
+  // ボタンで作れる形の行は 空白も消す。行（Alt+Enter）は 残す。空の行は 消す
+  function nfkcKeep(s) {
+    return String(s).replace(/[①-⑳]/g, function(c) { return String.fromCharCode(0xE000 + c.charCodeAt(0) - 0x2460); })
+      .normalize("NFKC").replace(/[-]/g, function(c) { return String.fromCharCode(0x2460 + c.charCodeAt(0) - 0xE000); });
+  }
+  function normLine(line) {
+    var s = line.trim().replace(/[、，]/g, ",");
+    var tight = s.replace(/\s+/g, "");
+    if (tight && splitLine(tight).filter(Boolean).every(function(p) { return parsePart(p).raw == null; })) return tight;
+    return s.replace(/\s*,\s*/g, ",");
+  }
+  function norm(v) {
+    return nfkcKeep(v == null ? "" : v).toUpperCase().replace(/\r\n?/g, "\n").split("\n").map(normLine).filter(function(l) { return l !== ""; }).join("\n");
+  }
+  function posSort(a) {
+    return a.slice().sort(function(x, y) { var nx = /^\d+$/.test(x), ny = /^\d+$/.test(y); return nx && ny ? x - y : nx ? -1 : ny ? 1 : 0; });
+  }
+  // 7 の番号 — 4つ以上 続いていれば「1-4」、ほかは「1,2,3」（例 7F①1-4・7F②1,2,3）
+  function posText7(pos) {
+    var a = posSort(pos);
+    var run = a.length >= 4 && a.every(function(x, i) { return /^\d+$/.test(x) && (i === 0 || +x === +a[i - 1] + 1); });
+    return run ? a[0] + "-" + a[a.length - 1] : a.join(",");
+  }
+  function partText(p) {
+    if (p.raw != null) return p.raw;
+    if (p.cont) return partText({ room: p.cont, lanes: p.lanes }).slice(p.cont.length);   // 続きの行 — 部屋は 書かない
+    if (!p.room) return "";
+    if (p.room === "7") return "7" + p.lanes.map(function(l) { return l.L + l.secs.map(function(s) { return circ(s.c) + posText7(s.pos); }).join(""); }).join("");
+    if (p.room.length === 1) return p.room;
+    return p.room + p.lanes.map(function(l) { return l.L + (l.pos.length ? "(" + posSort(l.pos).join(",") + ")" : ""); }).join("");
+  }
+
+  // 入れている部分 — S.parts（sep = 前の部分との間: "," か "\n"（改行）か ",\n"）。S.li = 列、S.si = 7 の ①〜⑤
+  var S = { parts: [{ room: "", lanes: [], sep: "" }], pi: 0, li: -1, si: -1, letters: false, opts: null, side: false };
+  var root = null;
+  function $(id) { return document.getElementById(id); }
+  function announce(isOpen) { try { document.dispatchEvent(new CustomEvent("locpad", { detail: { open: isOpen } })); } catch (e) {} }
+
+  function build() {
+    if (root) return;
+    root = document.createElement("div");
+    root.id = "lpRoot";
+    if (S.side) root.className = "side";
+    root.innerHTML =
+      '<div class="lp-in">' +
+        '<div class="lp-head">' +
+          '<div class="lp-top"><div class="lp-who" id="lpWho"></div><button class="lp-btn" id="lpClose">閉じる</button></div>' +
+          '<div class="lp-acts"><span class="lp-prog" id="lpProg"></span><span class="lp-grow"></span>' +
+            '<button class="lp-btn dis" id="lpDiscard">取り消す</button><button class="lp-btn pri" id="lpSave"></button></div>' +
+        '</div>' +
+        '<div class="lp-row"><textarea id="lpIn" rows="1" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="場所"></textarea><button class="lp-btn yel" id="lpOk"></button></div>' +
+        '<div class="lp-quick" id="lpQuick"></div>' +
+        '<div class="lp-parts" id="lpParts"></div>' +
+        '<div class="lp-build">' +
+          '<div class="lp-lbl">部屋</div><div class="lp-keys" id="lpRoom"></div>' +
+          '<div class="lp-lbl" id="lpLaneLbl">列</div><div class="lp-keys" id="lpLane"></div>' +
+          '<div class="lp-lbl" id="lpSecLbl">①〜⑤</div><div class="lp-keys" id="lpSec"></div>' +
+          '<div class="lp-lbl" id="lpPosLbl">（ ）の中 — いくつでも</div><div class="lp-keys" id="lpPos"></div>' +
+          '<div class="lp-keys" id="lpAct"></div>' +
+        '</div>' +
+        '<div class="lp-foot"><span id="lpHint"></span><span class="lp-grow"></span><button class="lp-btn" id="lpSkip">とばす</button></div>' +
+      '</div>';
+    document.body.appendChild(root);
+    var inp = $("lpIn");
+    inp.addEventListener("input", function() { parseInto(inp.value); keys(); grow(); changed(); });
+    inp.addEventListener("keydown", function(e) {
+      if (e.isComposing || e.keyCode === 229) return;           // 日本語の変換中の Enter は 確定にしない
+      if (e.key === "Enter" && (e.altKey || e.shiftKey)) { e.preventDefault(); newline(); }   // Alt+Enter = 改行（長い場所を 2行に）
+      else if (e.key === "Enter") { e.preventDefault(); ok(); }
+      else if (e.key === "Escape") { e.preventDefault(); close(); }
+    });
+    // ここで押したキーは 画面のほかの所に渡さない（出庫処理の「Enter で出庫」・「Esc で前の段階へ」などが動かないように）
+    root.addEventListener("keydown", function(e) { e.stopPropagation(); });
+    $("lpOk").onclick = ok;
+    $("lpClose").onclick = close;
+    $("lpSkip").onclick = function() { if (S.opts && S.opts.onSkip) S.opts.onSkip(); };
+    $("lpSave").onclick = function() { var f = S.opts && S.opts.foot; if (f && f.onSave) f.onSave(); };
+    $("lpDiscard").onclick = function() { var f = S.opts && S.opts.foot; if (f && f.onDiscard) f.onDiscard(); };
+    root.addEventListener("click", function(e) {
+      var b = e.target.closest("[data-lp]"); if (!b || b.disabled) return;
+      var a = b.getAttribute("data-lp"), v = b.getAttribute("data-v");
+      if (a === "room") setRoom(v); else if (a === "lane") setLane(v); else if (a === "sec") setSec(+v); else if (a === "pos") togglePos(v);
+      else if (a === "part") { S.pi = +v; selectEnd(); keys(); }
+      else if (a === "sib") { inp.value = v; parseInto(v); keys(); grow(); changed(); if (!coarse()) inp.focus(); }
+      else if (a === "letters") { S.letters = !S.letters; keys(); }
+      else if (a === "newpart") { S.parts.push({ room: "", lanes: [], sep: "," }); S.pi = S.parts.length - 1; S.li = -1; S.si = -1; S.letters = false; put(); }
+      else if (a === "newline") newline();
+      else if (a === "back") backspace();
+      else if (a === "clear") { parseInto(""); put(); }
+    });
+  }
+  function coarse() { try { return matchMedia("(pointer: coarse)").matches; } catch (e) { return false; } }
+  function grow() { var i = $("lpIn"); i.rows = Math.max(1, i.value.split("\n").length); }
+
+  // 改行 — 文字の途中なら そこに、終わりなら 次の行に 新しい部分
+  function newline() {
+    var inp = $("lpIn"), at = inp.selectionStart, end = inp.selectionEnd, v = inp.value;
+    // 次の行は 上の 部屋の続き（列から 入れられる）— 別の部屋は 部屋の ボタンで
+    if (at == null || at >= v.length) { var cur = S.parts[S.pi]; if (partText(cur)) { S.parts.push({ room: "", lanes: [], sep: "\n", cont: contRoom(cur) }); S.pi = S.parts.length - 1; S.li = -1; S.si = -1; } put(); return; }
+    inp.value = v.slice(0, at) + "\n" + v.slice(end);
+    inp.selectionStart = inp.selectionEnd = at + 1;
+    parseInto(inp.value); keys(); grow(); changed();
+  }
+  function selectEnd() {
+    var p = S.parts[S.pi];
+    S.li = p.lanes ? p.lanes.length - 1 : -1;
+    var lane = p.lanes && p.lanes[S.li];
+    S.si = lane && lane.secs ? lane.secs.length - 1 : -1;
+  }
+  function parseInto(v) {
+    var parts = [], lines = String(v == null ? "" : v).split("\n"), lineSep = "", ctx = "";
+    // 部分を 読む — 列だけの 部分は 上の 部屋の続き（ctx）。読むたびに ctx を その部分の 部屋に
+    var readSegs = function(segs, c) {
+      return segs.map(function(s) { var p = parsePart(s, c); c = p.raw != null ? "" : contRoom(p); return p; });
+    };
+    lines.forEach(function(line, li) {
+      var t = line.trim(), trail = /,$/.test(t);
+      var ps = readSegs(splitLine(nfkcKeep(t).toUpperCase().replace(/[、，]/g, ",").replace(/\s+/g, "")).filter(Boolean), ctx);
+      if (ps.some(function(p) { return p.raw != null; })) ps = readSegs(splitLine(t).filter(Boolean), ctx);   // 形に合わない所があれば 打ったまま
+      ps.forEach(function(p, k) { p.sep = k ? "," : (parts.length ? lineSep || "\n" : ""); parts.push(p); ctx = p.raw != null ? "" : contRoom(p); });
+      if (li < lines.length - 1) lineSep = trail ? ",\n" : "\n";
+      else if (trail && parts.length) parts.push({ room: "", lanes: [], sep: "," });   // 最後が「,」— 次の部屋を入れる所
+    });
+    if (lines.length > 1 && lines[lines.length - 1].trim() === "" && parts.length) parts.push({ room: "", lanes: [], sep: lineSep || "\n", cont: /\n/.test(lineSep || "\n") ? ctx : "" });   // 改行したばかり — 上の 部屋の続き
+    S.parts = parts.length ? parts : [{ room: "", lanes: [], sep: "" }];
+    S.pi = S.parts.length - 1;
+    selectEnd();
+  }
+  // 部分を つなぐ。入れている途中の 空の部分は その前の「,」「↵」だけ 見せる
+  function compose() {
+    var out = "";
+    S.parts.forEach(function(p, i) {
+      var t = partText(p);
+      if (!t && i !== S.pi) return;
+      out += (out ? (p.sep || ",") : "") + t;
+    });
+    return out;
+  }
+  function put() { $("lpIn").value = compose(); keys(); grow(); changed(); }
+  function changed() { if (S.opts && S.opts.onInput) S.opts.onInput(dirty()); else setFoot(S.opts && S.opts.foot); }
+
+  function keys() {
+    var p = S.parts[S.pi], edit = p && p.raw == null, er = edit ? roomOf(p) : "", seven = edit && er === "7", big = edit && (er.length === 2 || seven);   // er = 続きの行は 上の 部屋
+    var lane = big ? p.lanes[S.li] : null, sec = seven && lane ? lane.secs[S.si] : null;
+    $("lpParts").innerHTML = (S.parts.length > 1 || (p && p.raw != null)) ? S.parts.map(function(x, i) {
+      return (i ? '<span class="lp-comma">' + (/\n/.test(x.sep) ? "↵" : ",") + '</span>' : "") + '<button data-lp="part" data-v="' + i + '" class="' + (i === S.pi ? "on " : "") + (x.raw != null ? "raw" : "") + '">' + esc(partText(x) || "…") + '</button>';
+    }).join("") : "";
+    $("lpRoom").innerHTML = ROOMS.map(function(r) {
+      return '<button data-lp="room" data-v="' + r + '" class="' + (edit && p.room === r ? "on" : "") + '"' + (edit ? "" : " disabled") + '>' + r + '</button>';
+    }).join("");
+    var lanes = seven ? LANES_7 : LANES_8;
+    $("lpLane").innerHTML = big ? lanes.map(function(L) {
+      var i = p.lanes.findIndex(function(l) { return l.L === L; });
+      return '<button data-lp="lane" data-v="' + L + '" class="sm ' + (i === S.li ? "on" : i >= 0 ? "has" : "") + '">' + L + '</button>';
+    }).join("") : '<span class="lp-dim">' + (edit && p.room ? "（5・6 は 部屋だけ）" : "部屋を選ぶと 出ます") + '</span>';
+    $("lpLaneLbl").textContent = (seven ? "列（A〜X）" : "列") + (edit && p.cont ? "（" + p.cont + " の続き — 別の部屋は 上の 部屋を）" : "");
+    // 7: ①〜⑤
+    $("lpSecLbl").style.display = $("lpSec").style.display = seven ? "" : "none";
+    $("lpSec").innerHTML = seven ? SECS_7.map(function(c) {
+      var i = lane ? lane.secs.findIndex(function(s) { return s.c === c; }) : -1;
+      return '<button data-lp="sec" data-v="' + c + '" class="circ ' + (i >= 0 && i === S.si ? "on" : i >= 0 ? "has" : "") + '"' + (lane ? "" : " disabled") + '>' + circ(c) + '</button>';
+    }).join("") : "";
+    // 番号 — 7 は ①〜⑤ の中の 1〜4、81〜87 は （ ）の中（1〜4・文字）
+    var posOn = seven ? sec : lane, posList = seven ? (sec ? sec.pos : []) : (lane ? lane.pos : []);
+    var posKey = function(v, sm) { return '<button data-lp="pos" data-v="' + v + '" class="' + (sm ? "sm " : "") + (posList.indexOf(v) >= 0 ? "on" : "") + '"' + (posOn ? "" : " disabled") + '>' + v + '</button>'; };
+    $("lpPosLbl").textContent = seven ? "番号 — いくつでも（4つ続くと 1-4）" : "（ ）の中 — いくつでも";
+    $("lpPos").innerHTML = POS_NUM.map(function(v) { return posKey(v); }).join("") + (seven ? "" :
+      '<span class="lp-sep"></span><button data-lp="letters" class="act ' + (S.letters ? "on" : "") + '"' + (lane ? "" : " disabled") + '>文字 A〜N</button>' +
+      (S.letters && lane ? '<span class="lp-br"></span>' + LANES_8.map(function(v) { return posKey(v, true); }).join("") : ""));
+    $("lpAct").innerHTML = '<button data-lp="newpart" class="act"' + (p && partText(p) ? "" : " disabled") + '>，別の部屋も</button>' +
+      '<button data-lp="newline" class="act" title="Alt+Enter"' + (p && partText(p) ? "" : " disabled") + '>↵ 改行</button>' +
+      '<button data-lp="back" class="act">⌫ 1つ消す</button><button data-lp="clear" class="act">クリア</button>';
+    $("lpLaneLbl").style.opacity = big ? 1 : .4;
+    $("lpSecLbl").style.opacity = lane ? 1 : .4;
+    $("lpPosLbl").style.opacity = posOn ? 1 : .4;
+  }
+  // 部屋 — 形が変わる時（7 ⇔ 81〜87 ⇔ 5・6）は 列を 消す
+  function setRoom(r) {
+    var p = S.parts[S.pi], kind = function(x) { return x === "7" ? 7 : x.length === 2 ? 8 : x ? 1 : 0; };
+    if (r.length === 1 && r !== "7") p.lanes = [];
+    else if (kind(roomOf(p)) !== kind(r)) p.lanes = [];
+    p.room = r; delete p.cont;   // 続きの行に 部屋を押した — その部屋の 行に
+    selectEnd(); put();
+  }
+  // 列: まだ無い列 → 足す（今の列に中身が無ければ 置きかえ）。ある列 → その列を選ぶ
+  function setLane(L) {
+    var p = S.parts[S.pi], seven = roomOf(p) === "7", i = p.lanes.findIndex(function(l) { return l.L === L; }), cur = p.lanes[S.li];
+    var empty = function(l) { return seven ? !l.secs.length : !l.pos.length; };
+    if (i >= 0) { S.li = i; var l = p.lanes[i]; S.si = seven ? l.secs.length - 1 : -1; }
+    else if (cur && empty(cur)) cur.L = L;
+    else { p.lanes.push(seven ? { L: L, secs: [] } : { L: L, pos: [] }); S.li = p.lanes.length - 1; S.si = -1; }
+    put();
+  }
+  // 7 の ①〜⑤ — 列と同じ（無い → 足す・中身の無い今の所は 置きかえ・ある → 選ぶ）
+  function setSec(c) {
+    var lane = S.parts[S.pi].lanes[S.li]; if (!lane) return;
+    var i = lane.secs.findIndex(function(s) { return s.c === c; }), cur = lane.secs[S.si];
+    if (i >= 0) S.si = i;
+    else if (cur && !cur.pos.length) cur.c = c;
+    else { lane.secs.push({ c: c, pos: [] }); S.si = lane.secs.length - 1; }
+    put();
+  }
+  function togglePos(v) {
+    var p = S.parts[S.pi], lane = p.lanes[S.li], box = roomOf(p) === "7" ? lane && lane.secs[S.si] : lane;
+    if (!box) return;
+    var i = box.pos.indexOf(v); if (i >= 0) box.pos.splice(i, 1); else box.pos.push(v);
+    put();
+  }
+  // ⌫ — 最後に入れた物を1つ（番号 → ①〜⑤ → 列 → 部屋 → その部分）。空になった部分は残さない
+  function backspace() {
+    var p = S.parts[S.pi];
+    if (p.raw != null) S.parts.splice(S.pi, 1);
+    else {
+      var lane = p.lanes[S.li], sec = roomOf(p) === "7" && lane ? lane.secs[S.si] : null;
+      if (sec && sec.pos.length) sec.pos.pop();
+      else if (sec) { lane.secs.splice(S.si, 1); S.si = lane.secs.length - 1; }
+      else if (lane && lane.pos && lane.pos.length) lane.pos.pop();
+      else if (lane) { p.lanes.splice(S.li, 1); selectEnd(); }
+      else if (p.room) { p.room = ""; if (S.parts.length > 1) S.parts.splice(S.pi, 1); }
+      else if (S.parts.length > 1) S.parts.splice(S.pi, 1);
+    }
+    if (!S.parts.length) S.parts = [{ room: "", lanes: [], sep: "" }];
+    if (S.pi >= S.parts.length) { S.pi = S.parts.length - 1; selectEnd(); }
+    put();
+  }
+
+  // info: [{ k: "入庫数", v: 12, big: true }, …] — 名前の下に出す（空の値は出さない）
+  function infoHtml(list) {
+    var xs = (list || []).filter(function(x) { return x && x.v !== "" && x.v != null; });
+    return xs.length ? '<div class="lp-info">' + xs.map(function(x) {
+      return '<div class="lp-i' + (x.big ? " big" : "") + '"><em>' + esc(x.k) + "</em><strong>" + esc(x.v) + "</strong></div>";
+    }).join("") + "</div>" : "";
+  }
+
+  function render() {
+    var o = S.opts;
+    $("lpWho").innerHTML = (o.title ? "<b>" + esc(o.title) + "</b>" : "") + "<span>" + esc(o.sub || "") + "</span>" + infoHtml(o.info);
+    $("lpProg").textContent = o.progress || "";
+    $("lpOk").textContent = o.okText || "決定";
+    var sib = (o.siblings || []).filter(function(s) { return s && s.v; });
+    $("lpQuick").innerHTML = sib.length ? '<span class="lp-ql">' + esc(o.siblingsLabel || "同じ伝票") + '</span>' + sib.map(function(s) {
+      return '<button data-lp="sib" data-v="' + esc(s.v) + '" class="' + (s.pend ? "pend" : "") + '">' + (s.n ? "<i>" + esc(s.n) + "</i>" : "") + esc(show(s.v)) + '</button>';
+    }).join("") : "";
+    $("lpHint").textContent = o.hint != null ? o.hint : (o.onSkip ? "Enter = 入れて次へ ・ Alt+Enter = 改行" : "Enter = " + (o.okText || "決定") + " ・ Alt+Enter = 改行");
+    $("lpSkip").style.display = o.onSkip ? "" : "none";
+    setFoot(o.foot);
+  }
+  // 「保存する」「取り消す」— いつも上に。入れている途中（Enter 前）でも 保存できる（onStage で先に入れる）
+  function setFoot(f) {
+    if (!root || !S.opts) return;
+    S.opts.foot = f || null;
+    var b = $("lpSave"), d = $("lpDiscard"), n = f ? (f.count || 0) : 0;
+    if (!f || !f.onSave) { b.style.display = "none"; d.style.display = "none"; return; }
+    b.style.display = "";
+    b.disabled = !(n || dirty()) || !!f.busy;
+    b.textContent = f.busy ? "保存中…" : "保存する" + (n ? "（" + n + "）" : "");
+    d.style.display = f.onDiscard && n ? "" : "none";
+  }
+  function dirty() { return !!(S.opts && S.opts.onStage) && norm($("lpIn").value) !== norm(S.opts.value || ""); }
+  function stageNow() {
+    if (!dirty()) return false;
+    var v = norm($("lpIn").value);
+    if (!checkText(v)) return false;
+    S.opts.onStage(v);
+    if (S.opts) S.opts.value = v;
+    return true;
+  }
+  function checkText(v) {
+    if (v.length > 120 || /[;{}]|function\s*\(|=>|getElementById/.test(v)) { alert("場所として長すぎるか、コードのような文字です。確かめてください。"); return false; }
+    return true;
+  }
+  function ok() {
+    if (!S.opts) return;
+    var v = norm($("lpIn").value);
+    if (!checkText(v)) return;
+    if (S.opts.onOk) S.opts.onOk(v);
+  }
+  function open(opts) {
+    build();
+    S.opts = opts || {};
+    S.letters = false;
+    var v = norm(S.opts.value || "");
+    $("lpIn").value = v;
+    parseInto(v);
+    if (S.parts.some(function(p) { return p.raw == null && p.room !== "7" && p.lanes && p.lanes.some(function(l) { return l.pos.some(function(x) { return /[A-Z]/.test(x); }); }); })) S.letters = true;
+    render(); keys(); grow();
+    var was = root.classList.contains("open");
+    root.classList.add("open");
+    if (!was) announce(true);
+    if (!coarse()) setTimeout(function() { var i = $("lpIn"); i.focus(); i.select(); }, 50);   // スマホは ボタンで入れるので キーボードを出さない
+  }
+  function close() {
+    if (!root || !root.classList.contains("open")) return;
+    root.classList.remove("open");
+    var o = S.opts; S.opts = null;
+    if (o && o.onClose) o.onClose();
+    announce(false);
+  }
+  function setSide(on) { S.side = !!on; if (root) root.classList.toggle("side", S.side); }
+  window.LocPad = { open: open, close: close, isOpen: function() { return !!(root && root.classList.contains("open")); }, norm: norm, setFoot: setFoot, setSide: setSide,
+                    dirty: function() { return !!root && dirty(); }, stageNow: stageNow,
+                    _parse: function(v) { parseInto(v); return compose(); } };
+})();
+</script>
+<!-- LOCPAD END -->
 <script>
 (function () {
   "use strict";
@@ -686,6 +1149,7 @@
   }
 
   function handle(raw) {
+    if (window.LocPad && LocPad.isOpen()) return;   // 場所の 入力中
     var p = parseCode(raw);
     if (!p) return;
     if (p.noClient) { $("scanErr").textContent = "品番だけでは 得意先が わかりません — 27-10001 の 形で"; beep(false); return; }
@@ -739,7 +1203,7 @@
         (y > 0 ? '<div class="yoyaku"><div><div class="yk">予約あり</div><div class="yn">×' + esc(y) + '</div></div><div class="sub">出庫予定数（在庫数は 引いた 数）</div></div>'
                : '<div class="empty-msg">予約なし</div>') +
         '<div class="pane-foot"><button type="button" class="refresh-btn" id="refreshBtn">↻ データ更新</button>' +
-          '<button type="button" class="refresh-btn" id="openPage">商品ページ ↗</button></div>' +
+          '<button type="button" class="refresh-btn" id="openPage">🏷 ラベル印刷 ↗</button></div>' +
         '<div class="updated-ts">最終更新: ' + stamp(Date.now()) + "</div>" +
       "</div>" +
       '<div class="pane' + (tab === "kiroku" ? " active" : "") + '" data-pane="kiroku"><div class="sec-head">記録</div><div id="kirokuArea"></div></div>' +
@@ -767,7 +1231,8 @@
     var b = e.target.closest("button"), card = $("card"); if (!b) return;
     var c = card.getAttribute("data-c"), id = card.getAttribute("data-id");
     if (b.hasAttribute("data-tab")) setTab(b.getAttribute("data-tab"));
-    else if (b.id === "openPage" || b.id === "locEdit") openProductPage(c, id);
+    else if (b.id === "locEdit") openLocEdit(c, id);
+    else if (b.id === "openPage") openProductPage(c, id);
     else if (b.id === "refreshBtn") showItem(c, id, true);
     else return;
     focusScan();
@@ -1100,15 +1565,21 @@
   }
 
   // ラベルを 読んだ 時（出庫 モード）
-  function pickScan(c, id) {
+  //  key = 「どの 伝票ですか？」で 選んだ 伝票（その 伝票を 開いて ✓）
+  function pickScan(c, id, key) {
     var code = c + "-" + id;
+    if (!key && !$("slipAsk").classList.contains("hidden")) { beep(false); return; }   // 選ぶ 画面が 出て いる 間は 読まない
     if (popHold) { beep(false); var pc = $("pop").querySelector(".pop-card"); pc.classList.remove("shake"); void pc.offsetWidth; pc.classList.add("shake"); return; }
     if (!pk.slips) { pickMsg("bad", code, "伝票を 読み込み中です — 少し 待って もう一度"); beep(false); renderPick(); return; }
-    var s = pk.open && slipByKey(pk.open);
-    if (!s) {   // 一覧 — その 品番の 伝票を 開く（まだ 終わって いない 方を 先に）
+    var s = key ? openSlip(key) : (pk.open && slipByKey(pk.open));
+    if (key && !s) { pickMsg("bad", code, "伝票が 見つかりません — ↻ 読み直して もう一度"); beep(false); renderPick(); return; }
+    if (key) window.scrollTo(0, 0);
+    if (!s) {   // 一覧 — その 品番の 伝票を 開く。まだ ✓ して いない 伝票が 2枚 以上 あれば どれか 聞く
       var hits = pk.slips.filter(function (x) { return x.c === c && x.lines.some(function (l) { return l.id === id; }); });
       if (!hits.length) { pickMsg("bad", code, "商品が ちがいます — この 日の 伝票に ない 商品です"); beep(false); renderPick(); return; }
-      s = openSlip((hits.filter(function (x) { return slipCount(x) < x.lines.length; })[0] || hits[0]).key);
+      var todo = hits.filter(function (x) { return !shipped(x) && !slipLines(x)[id]; });
+      if (todo.length > 1) { askSlip(c, id, todo); return; }
+      s = openSlip((todo[0] || hits.filter(function (x) { return slipCount(x) < x.lines.length; })[0] || hits[0]).key);
       window.scrollTo(0, 0);
     }
     if (c !== s.c) { pickMsg("bad", code, "得意先が ちがいます — この 伝票は " + s.client); beep(false); renderPick(); return; }
@@ -1159,10 +1630,39 @@
     }
     focusScan();
   });
+  // どの 伝票ですか？ — 時刻・得意先・引取先・運送・担当者・この 品番の 数 を 見て 選ぶ
+  function askSlip(c, id, list) {
+    var first = list[0].lines.filter(function (l) { return l.id === id; })[0] || {};
+    $("slipAskS").textContent = c + "-" + id + "　" + (first.name || "") + " — " + list.length + " 枚の 伝票に あります";
+    $("slipAskL").innerHTML = list.map(function (x) {
+      var l = x.lines.filter(function (q) { return q.id === id; })[0] || {}, n = slipCount(x);
+      var row = function (k, v) { return '<div class="sp-row"><span>' + k + "</span><b>" + esc(v || "—") + "</b></div>"; };
+      return '<button type="button" data-key="' + esc(x.key) + '">' +
+        '<div class="sp-top"><span>' + esc(x.time || "—") + "</span><span>" + esc(x.client) + '</span><span class="sp-qty">' + esc(l.qty == null ? "" : l.qty) + " " + esc(unitOf(c, id)) + "</span></div>" +
+        row("引取先", x.hikitori) + row("運送", x.unso) + row("担当者", x.tantou) +
+        '<div class="sp-prog">' + x.lines.length + " 行・チェック " + n + " / " + x.lines.length + "</div></button>";
+    }).join("");
+    $("slipAsk").dataset.c = c; $("slipAsk").dataset.id = id;
+    $("slipAsk").classList.remove("hidden");
+    tone(660, 0, 0.14);
+  }
+  function closeSlipAsk() { $("slipAsk").classList.add("hidden"); }
+  $("slipAskNo").addEventListener("click", function () { closeSlipAsk(); focusScan(); });
+  $("slipAskL").addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-key]"); if (!b) return;
+    var c = $("slipAsk").dataset.c, id = $("slipAsk").dataset.id;
+    closeSlipAsk();
+    pickScan(c, id, b.getAttribute("data-key"));
+    focusScan();
+  });
   $("shipNo").addEventListener("click", function () { $("shipAsk").classList.add("hidden"); focusScan(); });
   $("shipGo").addEventListener("click", function () {
     var s = slipByKey($("shipAsk").dataset.key || ""); $("shipAsk").classList.add("hidden");
-    if (s && !shipped(s)) { queuePick(s, "🚚", true, true); pk.msg = null; beep(true); renderPick(); }
+    if (s && !shipped(s)) {   // 確定したら 伝票の 一覧へ 戻る（次の 伝票へ・2026-11-12）
+      queuePick(s, "🚚", true, true); pk.open = ""; beep(true);
+      pickMsg("ok", "", "🚚 出庫 確定 — " + s.client + " " + (s.time || ""));
+      renderPick(); window.scrollTo(0, 0);
+    }
     focusScan();
   });
   function setState(text, cls) { var el = $("cardState"); if (el) { el.textContent = text; el.className = "state " + (cls || ""); } }
@@ -1229,8 +1729,44 @@
     showItem(r.getAttribute("data-c"), r.getAttribute("data-id")); focusScan();
   });
 
+  // ── 場所の 変更（この 画面で）— LocPad で 入れる → 確かめる → サーバーへ（api=loc）。電波が 無い 時は 変えられない ──
+  function openLocEdit(c, id) {
+    var it = (lists[c] && lists[c].items[id]) || cardItem;
+    if (!it || !window.LocPad) return;
+    var cur = String(it.location || "");
+    LocPad.open({
+      title: c + "-" + id, sub: it.name || "", value: cur, okText: "決定",
+      onClose: function () { setTimeout(focusScan, 50); },
+      onOk: function (v) {
+        v = String(v == null ? "" : v).trim();
+        if (!v) { alert("場所を 入れて ください"); return; }
+        if (v === cur) { LocPad.close(); focusScan(); return; }
+        if (!confirm(c + "-" + id + " の 場所を 変えますか？\n\n" + (cur || "（なし）") + "\n   ↓\n" + v)) return;
+        LocPad.close();
+        setState("場所を 保存中…", "wait");
+        apiPost({ api: "loc", client: c, id: id, loc: v }).then(function (j) {
+          var nv = String(j.newLocation == null ? v : j.newLocation);
+          it.location = nv;
+          var L = lists[c];
+          if (L && L.items && L.items[id]) {
+            L.items[id].location = nv;
+            lsSet(K.list + c, JSON.stringify({ at: L.at || Date.now(), items: Object.keys(L.items).map(function (k) { return L.items[k]; }) }));
+          }
+          delete kiroku[c + "-" + id];   // 場所の 記録を 読み直す
+          beep(true);
+          showItem(c, id, true);
+          showPop("ok", c + "-" + id, "✓ 場所を 変えました — " + nv);
+        }).catch(function (e) {
+          if (e && e.auth) return;
+          beep(false); setState("場所を 変えられませんでした", "err");
+          alert("場所を 変えられませんでした: " + ((e && e.message) || e) + "\n（電波を 確かめて もう一度）");
+          focusScan();
+        });
+      }
+    });
+  }
   function openProductPage(c, id) {
-    var url = API + "?page=product&client=" + encodeURIComponent(c) + "&id=" + encodeURIComponent(id) + "&t=" + encodeURIComponent(token);
+    var url = API + "?page=product&client=" + encodeURIComponent(c) + "&id=" + encodeURIComponent(id) + "&tab=label&t=" + encodeURIComponent(token);   // ラベルの タブで 開く
     window.open(url, "_blank");
   }
 
@@ -1353,7 +1889,7 @@
 
   // ── 新しい 版が 出ていたら 読み直す（ホーム画面の アプリは 古い 版を しばらく 覚えている）──
   // 開いた 時だけ（カメラを 開いた 後に 読み直すと また 許可を 聞くので）。同じ 版へは 1回だけ（ループ しない）。
-  var VERSION = "2026-11-10c";
+  var VERSION = "2026-11-12b";
   $("verLbl").textContent = "版 " + VERSION;
   function checkUpdate() {
     if (!window.fetch) return;
