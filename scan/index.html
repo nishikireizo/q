@@ -1904,12 +1904,16 @@
       if (!live()) return;
       wrap.innerHTML = '<div class="lbl-page" id="lblPage">' + labelHtml(c, id, it, qrData(c + "-" + id)) + "</div>";
       fitLabel(c); scaleLabel();
-      if (!canShareFiles() && $("lblPrint")) $("lblPrint").disabled = false;
+      if (!canShareFiles() && !PDF_PRINT && $("lblPrint")) $("lblPrint").disabled = false;
       var done = function () {
         if (!live()) return;
         fitLabel(c); scaleLabel();
-        if (!canShareFiles()) return;
-        labelPdf(c + "-" + id).then(function (file) { if (live()) { lblFile = file; if ($("lblPrint")) $("lblPrint").disabled = false; } })
+        if (!canShareFiles() && !PDF_PRINT) return;
+        labelPdf(c + "-" + id).then(function (file) {
+          if (!live()) return;
+          lblFile = file;
+          return (PDF_PRINT ? loadPdfFrame(file) : null);
+        }).then(function () { if (live() && $("lblPrint")) $("lblPrint").disabled = false; })
           .catch(function () { if (live() && $("lblPrint")) $("lblPrint").disabled = false; });   // PDF が 作れない 時は 今までの 印刷
       };
       if (document.fonts && document.fonts.ready) document.fonts.ready.then(done); else done();
@@ -1918,7 +1922,22 @@
     });
   }
   // ── PDF（A4 横・1枚）— 画面の ラベルを そのまま 絵に して 入れる。共有 → Canon PRINT など ──
-  var USE_SHARE = false;   // 共有メニューは 使わない（2026-11-12f — ユーザーの 希望で 印刷に 戻す）
+  var USE_SHARE = false;
+  // iPhone / iPad: ラベルの PDF（A4 横）を 見えない 枠に 読み込んで おき、🖨 で その PDF を 印刷（試し・2026-11-12g）
+  var PDF_PRINT = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  var lblFrameUrl = "";
+  function loadPdfFrame(file) {
+    var fr = $("lblFrame");
+    if (!fr) { fr = document.createElement("iframe"); fr.id = "lblFrame"; fr.setAttribute("aria-hidden", "true"); fr.tabIndex = -1;
+      fr.style.cssText = "position:fixed;left:0;top:0;width:2px;height:2px;opacity:0;border:0;pointer-events:none;"; document.body.appendChild(fr); }
+    if (lblFrameUrl) { try { URL.revokeObjectURL(lblFrameUrl); } catch (e) {} }
+    fr.dataset.ok = "";
+    return new Promise(function (res) {
+      fr.onload = function () { fr.dataset.ok = "1"; res(); };
+      setTimeout(res, 3000);
+      lblFrameUrl = URL.createObjectURL(file); fr.src = lblFrameUrl;
+    });
+  }   // 共有メニューは 使わない（2026-11-12f — ユーザーの 希望で 印刷に 戻す）
   function canShareFiles() {
     if (!USE_SHARE) return false;
     try { return !!(navigator.share && navigator.canShare && window.File && navigator.canShare({ files: [new File(["x"], "t.pdf", { type: "application/pdf" })] })); } catch (e) { return false; }
@@ -1984,6 +2003,12 @@
     });
   }
   function shareOrPrintLabel() {
+    var fr = $("lblFrame");
+    if (PDF_PRINT && lblFile && fr && fr.dataset.ok && fr.contentWindow) {
+      prepPrintImage();   // 念のため: iPhone が 画面の 方を 印刷した 時も ラベルだけ 出る
+      try { fr.contentWindow.focus(); fr.contentWindow.print(); return; } catch (e) {}
+      window.print(); return;
+    }
     if (lblFile && canShareFiles()) {
       navigator.share({ files: [lblFile] }).catch(function (e) {
         if (e && e.name === "AbortError") return;   // やめた 時は 何も しない
@@ -1992,6 +2017,16 @@
       return;
     }
     printLabel();
+  }
+  function prepPrintImage() {
+    var pg = $("lblPage"); if (!pg) return "";
+    var out = $("lblOut");
+    if (!out) { out = document.createElement("div"); out.id = "lblOut"; document.body.appendChild(out); }
+    var src = "";
+    try { src = labelCanvas().toDataURL("image/jpeg", 0.92); } catch (e) {}
+    out.innerHTML = src ? '<img class="lbl-img" alt="" src="' + src + '">' : pg.outerHTML.replace(' id="lblPage"', "");
+    document.body.classList.add("lbl-printing");
+    return src;
   }
   function printLabel() {
     var pg = $("lblPage"); if (!pg) return;
@@ -2130,7 +2165,7 @@
 
   // ── 新しい 版が 出ていたら 読み直す（ホーム画面の アプリは 古い 版を しばらく 覚えている）──
   // 開いた 時だけ（カメラを 開いた 後に 読み直すと また 許可を 聞くので）。同じ 版へは 1回だけ（ループ しない）。
-  var VERSION = "2026-11-12f";
+  var VERSION = "2026-11-12g";
   $("verLbl").textContent = "版 " + VERSION;
   function checkUpdate() {
     if (!window.fetch) return;
