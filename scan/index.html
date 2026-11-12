@@ -299,6 +299,42 @@
   .pk-alert { margin: 0 0 10px; padding: 12px 14px; border-radius: 14px; background: var(--red-bg); border: 2px solid #c8432b; color: var(--red);
               font-size: 15px; font-weight: 700; line-height: 1.5; }
   .pk-alert span { display: block; font-size: 13px; font-weight: 500; color: var(--text); }
+  /* ══ 🏷 ラベル（A4 横・1枚。大きさは 決まり）══ */
+  .lbl-style { display: flex; gap: 6px; margin: 10px 0; }
+  .lbl-style button { flex: 1; padding: 10px; border-radius: 12px; font-weight: 700; }
+  .lbl-style button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .lbl-style button.active[data-lst="iriko"] { background: #fbd94f; border-color: #e0b800; color: #5c4600; }
+  .lbl-wrap { position: relative; overflow: hidden; margin: 10px 0 12px; border: 2px solid #ccc; border-radius: 8px; background: #fff; min-height: 60px; }
+  .lbl-go { width: 100%; padding: 14px; font-size: 17px; border-radius: 14px; }
+  .lbl-page { width: 1047px; height: 718px; transform-origin: 0 0; display: flex; flex-direction: column; padding: 8px 11px; box-sizing: border-box;
+              overflow: hidden; background: #fff; color: #000; font-family: "Noto Sans JP", sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .lbl-page .lt { display: flex; align-items: center; gap: 2%; flex: 0 0 24%; min-height: 0; }
+  .lbl-page .lcw { flex: 1; min-width: 0; height: 100%; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  .lbl-page .lc { font-weight: 600; letter-spacing: .12em; text-align: center; line-height: 1; white-space: nowrap; }
+  .lbl-page .lr { height: 3px; background: #000; margin: 11px 0; flex-shrink: 0; }
+  .lbl-page .lpr { flex: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; min-height: 0; }
+  .lbl-page .lp { font-weight: 700; text-align: center; line-height: 1.12; width: 100%; }
+  .lbl-page .lb { display: flex; justify-content: space-between; align-items: flex-end; flex-shrink: 0; }
+  .lbl-page .lbn { display: grid; grid-template-columns: 1fr auto 1fr; align-items: start; gap: 2%; flex-shrink: 0; }
+  .lbl-page .ldt { font-weight: 600; color: #444; line-height: 1.2; font-size: 45px; }
+  .lbl-page .ly { font-weight: 600; color: #000; font-size: 57px; }
+  .lbl-page .lbig, .lbl-page .lnum { font-weight: 700; line-height: .85; font-size: 204px; }
+  .lbl-page .lunit { font-weight: 700; font-size: 57px; }
+  .lbl-page .lq { flex-shrink: 0; width: 90px; height: 90px; }
+  .lbl-page .lq img { width: 100%; height: 100%; display: block; }
+  .lbl-page .lt .lq { margin-right: 38px; }
+  #lblOut { display: none; }
+  @media print {
+    @page { size: A4 landscape; margin: 0.5cm; }
+    body.lbl-printing { background: #fff !important; margin: 0 !important; padding: 0 !important; }
+    body.lbl-printing > :not(#lblOut) { display: none !important; }
+    body.lbl-printing #lblOut { display: block; }
+    body.lbl-printing #lblOut .lbl-page { width: 277mm; height: 190mm; margin: 0 auto; transform: none !important; }
+  }
+  /* 保存中（場所の 変更）*/
+  .busy-card { padding: 26px 22px; }
+  .spin { width: 56px; height: 56px; margin: 4px auto 14px; border: 6px solid #d6e6e2; border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
   /* ══ スキャン結果の ポップアップ ══ */
   .pop { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; padding: 20px;
          background: rgba(20, 40, 35, .45); }
@@ -444,6 +480,9 @@
     <div id="pickView" class="hidden"><div id="pickList"></div><div id="pickSlip"></div></div>
     </div>
     <!-- スキャン結果（出庫）: ✓ は 1秒ちょっとで 消える。✕・⚠ は OK を 押すまで 残る（その 間の スキャンは 受けない）-->
+    <div id="busy" class="pop hidden" role="status" aria-live="polite">
+      <div class="pop-card busy-card"><div class="spin"></div><div class="pop-t" id="busyT">保存中…</div></div>
+    </div>
     <div id="pop" class="pop hidden" role="alertdialog" aria-live="assertive">
       <div class="pop-card"><div class="pop-ic" id="popIc"></div><div class="pop-code" id="popCode"></div>
         <div class="pop-t" id="popT"></div><div class="pop-s" id="popS"></div>
@@ -1150,6 +1189,7 @@
 
   function handle(raw) {
     if (window.LocPad && LocPad.isOpen()) return;   // 場所の 入力中
+    if (!$("busy").classList.contains("hidden")) return;   // 保存中
     var p = parseCode(raw);
     if (!p) return;
     if (p.noClient) { $("scanErr").textContent = "品番だけでは 得意先が わかりません — 27-10001 の 形で"; beep(false); return; }
@@ -1165,7 +1205,7 @@
   //  場所は ピッキングで 一番 見る ので 基本情報の 一番 上に 大きく。
   //  記録（api=kiroku）は 品物と 同時に 読む。読んだ 記録は この アプリが 開いている 間 覚える（同じ 品物は すぐ 出る）。
   var tab = "info", kiroku = {}, cardItem = null;
-  var TABS = [["info", "基本情報"], ["kiroku", "記録"], ["location", "場所"]];
+  var TABS = [["info", "基本情報"], ["kiroku", "記録"], ["location", "場所"], ["label", "🏷 ラベル"]];
   function inDay(s) {   // 商品ページと 同じ 日付の 形（26/10/28）
     var m = String(s == null ? "" : s).trim().match(/^(\d{4})\s*[\/\-.年]\s*(\d{1,2})\s*[\/\-.月]\s*(\d{1,2})/);
     return m ? [m[1].slice(2), ("0" + m[2]).slice(-2), ("0" + m[3]).slice(-2)].join("/") : String(s == null ? "" : s);
@@ -1203,7 +1243,7 @@
         (y > 0 ? '<div class="yoyaku"><div><div class="yk">予約あり</div><div class="yn">×' + esc(y) + '</div></div><div class="sub">出庫予定数（在庫数は 引いた 数）</div></div>'
                : '<div class="empty-msg">予約なし</div>') +
         '<div class="pane-foot"><button type="button" class="refresh-btn" id="refreshBtn">↻ データ更新</button>' +
-          '<button type="button" class="refresh-btn" id="openPage">🏷 ラベル印刷 ↗</button></div>' +
+          '<button type="button" class="refresh-btn" id="openPage">🏷 ラベル印刷</button></div>' +
         '<div class="updated-ts">最終更新: ' + stamp(Date.now()) + "</div>" +
       "</div>" +
       '<div class="pane' + (tab === "kiroku" ? " active" : "") + '" data-pane="kiroku"><div class="sec-head">記録</div><div id="kirokuArea"></div></div>' +
@@ -1212,8 +1252,9 @@
           ? '<div class="loc-row current"><div style="min-width:0"><div class="loc-date">現在地</div><div class="loc-name big">' + esc(it.location) + '</div></div><button type="button" class="loc-edit-btn" id="locEdit">✏️ 場所変更</button></div>'
           : '<div class="loc-row"><div class="empty-msg" style="padding:0">場所情報なし</div><button type="button" class="loc-edit-btn" id="locEdit">✏️ 場所設定</button></div>') +
         '<div class="sec-head">場所の記録（部屋移動・場所の変更）</div><div id="locHist"></div>' +
-      "</div>";
+      "</div>" + labelPaneHtml(c);
     paintKiroku(c + "-" + id);
+    if (tab === "label") drawLabel(c, id, it);
   }
   function renderMsgCard(c, id, html, warn, chg) {
     var card = $("card");
@@ -1226,13 +1267,16 @@
     var card = $("card");
     Array.prototype.forEach.call(card.querySelectorAll("[data-tab]"), function (b) { b.classList.toggle("active", b.getAttribute("data-tab") === t); });
     Array.prototype.forEach.call(card.querySelectorAll("[data-pane]"), function (p) { p.classList.toggle("active", p.getAttribute("data-pane") === t); });
+    if (t === "label") drawLabel(card.getAttribute("data-c"), card.getAttribute("data-id"), cardItem);
   }
   $("card").addEventListener("click", function (e) {
     var b = e.target.closest("button"), card = $("card"); if (!b) return;
     var c = card.getAttribute("data-c"), id = card.getAttribute("data-id");
     if (b.hasAttribute("data-tab")) setTab(b.getAttribute("data-tab"));
     else if (b.id === "locEdit") openLocEdit(c, id);
-    else if (b.id === "openPage") openProductPage(c, id);
+    else if (b.id === "openPage") setTab("label");
+    else if (b.id === "lblPrint") { printLabel(); return; }
+    else if (b.hasAttribute("data-lst")) { lblStyle = b.getAttribute("data-lst"); drawLabel(c, id, cardItem); }
     else if (b.id === "refreshBtn") showItem(c, id, true);
     else return;
     focusScan();
@@ -1744,7 +1788,9 @@
         if (!confirm(c + "-" + id + " の 場所を 変えますか？\n\n" + (cur || "（なし）") + "\n   ↓\n" + v)) return;
         LocPad.close();
         setState("場所を 保存中…", "wait");
+        showBusy("場所を 保存中…");
         apiPost({ api: "loc", client: c, id: id, loc: v }).then(function (j) {
+          hideBusy();
           var nv = String(j.newLocation == null ? v : j.newLocation);
           it.location = nv;
           var L = lists[c];
@@ -1757,6 +1803,7 @@
           showItem(c, id, true);
           showPop("ok", c + "-" + id, "✓ 場所を 変えました — " + nv);
         }).catch(function (e) {
+          hideBusy();
           if (e && e.auth) return;
           beep(false); setState("場所を 変えられませんでした", "err");
           alert("場所を 変えられませんでした: " + ((e && e.message) || e) + "\n（電波を 確かめて もう一度）");
@@ -1765,10 +1812,111 @@
       }
     });
   }
-  function openProductPage(c, id) {
-    var url = API + "?page=product&client=" + encodeURIComponent(c) + "&id=" + encodeURIComponent(id) + "&tab=label&t=" + encodeURIComponent(token);   // ラベルの タブで 開く
-    window.open(url, "_blank");
+  // ── 🏷 ラベル印刷（この 画面で・2026-11-12）— A4 横・1枚・大きさは 自動。扇屋（27）だけ 通常 / いりこ用 ──
+  //   ラベルは 277mm × 190mm（1047 × 718 px）で 作って、画面では 小さく 見せる。印刷も 同じ もの。
+  var QR_SRC = "https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js";
+  var QR_SRI = "sha384-3zSEDfvllQohrq0PHL1fOXJuC/jSOO34H46t6UQfobFOmxE5BpjjaIJY5F2/bMnU";
+  var LBL_W = 1047, LBL_H = 718, qrLoading = null, lblStyle = "normal", lblSeq = 0, lblCode = "";
+  function loadQR() {
+    if (window.QRCode) return Promise.resolve();
+    if (qrLoading) return qrLoading;
+    qrLoading = new Promise(function (res, rej) {
+      var sc = document.createElement("script");
+      sc.src = QR_SRC; sc.integrity = QR_SRI; sc.crossOrigin = "anonymous";
+      sc.onload = function () { res(); }; sc.onerror = function () { qrLoading = null; rej(new Error("QR の 部品を 読めませんでした")); };
+      document.head.appendChild(sc);
+    });
+    return qrLoading;
   }
+  function qrData(text) {
+    var d = document.createElement("div");
+    new QRCode(d, { text: text, width: 256, height: 256, correctLevel: QRCode.CorrectLevel.M });
+    var cv = d.querySelector("canvas"), im = d.querySelector("img");
+    return cv ? cv.toDataURL("image/png") : (im ? im.src : "");
+  }
+  function labelPaneHtml(c) {
+    return '<div class="pane' + (tab === "label" ? " active" : "") + '" data-pane="label"><div class="sec-head">ラベル印刷（A4 横・1枚）</div>' +
+      (String(c) === "27" ? '<div class="lbl-style" id="lblStyle"><button type="button" data-lst="normal">通常</button><button type="button" data-lst="iriko">⚠ いりこ用</button></div>' : "") +
+      '<div class="lbl-wrap" id="lblWrap"><div class="empty-msg">ラベルを 作って います…</div></div>' +
+      '<button type="button" class="primary lbl-go" id="lblPrint" disabled>🖨 ラベル印刷</button></div>';
+  }
+  function labelHtml(c, id, it, qr) {
+    c = String(c);
+    var iriko = c === "27" && lblStyle === "iriko", nag = c === "55", name = String(it.name || "");
+    var cl = clientByNumber(c);
+    var top = iriko ? "扇" + id : nag ? name.slice(0, 5) : (cl ? (cl.label || cl.name) : "得意先 " + c);
+    var prod = nag ? name.slice(5).replace(/^\s+/, "") : name;
+    var dm = String(it.nyukoDate || "").match(/^(\d{4})\D+(\d{1,2})\D+(\d{1,2})/);
+    var dy = dm ? "'" + dm[1].slice(2) : "", md = dm ? (+dm[2]) + "/" + (+dm[3]) : String(it.nyukoDate || "");
+    var q0 = String(it.nyukoQty == null ? "" : it.nyukoQty).replace(/口/g, ""), qm = q0.match(/^(\d+\.?\d*)/), num = qm ? qm[1] : q0;
+    var q = '<div class="lq"><img src="' + qr + '" alt=""></div>';
+    var date = '<div class="ldt">入庫 <span class="ly">' + esc(dy) + '</span></div><div class="lbig">' + esc(md) + "</div>";
+    var qty = '<span class="lnum">' + esc(num) + '</span><span class="lunit">ヶ</span>';
+    var lines = prod.split("\n").filter(function (l) { return l.length; }).map(function (l) { return esc(l).replace(/ /g, "&nbsp; "); }).join("<br>");
+    var topH = (nag || iriko)
+      ? '<div class="lt" style="flex:0 0 40.6%"><div class="lcw"><div class="lc">' + esc(top) + "</div></div></div>"
+      : '<div class="lt"><div class="lcw"><div class="lc">' + esc(top) + "</div></div>" + q + "</div>";
+    var botH = iriko
+      ? '<div class="lb"><div>' + date + '</div><div style="display:flex;align-items:flex-end;gap:27px"><div style="line-height:.85">' + qty + "</div>" + q + "</div></div>"
+      : nag
+      ? '<div class="lbn">' + date + '<div style="display:flex;justify-content:flex-end">' + q + "</div></div>"
+      : '<div class="lb"><div>' + date + '</div><div style="line-height:.85">' + qty + "</div></div>";
+    return topH + '<div class="lr"></div><div class="lpr"><div class="lp">' + lines + '</div></div><div class="lr"></div>' + botH;
+  }
+  function fitText(el, w, h) {
+    var lo = 10, hi = 500, best = 10;
+    while (lo <= hi) {
+      var mid = (lo + hi) >> 1;
+      el.style.fontSize = mid + "px";
+      if (el.scrollWidth <= w && el.scrollHeight <= h) { best = mid; lo = mid + 1; } else hi = mid - 1;
+    }
+    el.style.fontSize = best + "px";
+    return best;
+  }
+  function fitLabel(c) {
+    var pg = $("lblPage"); if (!pg) return;
+    var lc = pg.querySelector(".lc"), lcw = pg.querySelector(".lcw"), lp = pg.querySelector(".lp"), lpr = pg.querySelector(".lpr");
+    if (lc && lcw) { var b = fitText(lc, lcw.clientWidth, lcw.clientHeight); if (String(c) === "55") lc.style.fontSize = Math.round(b * 1.2) + "px"; }
+    if (lp && lpr) fitText(lp, lpr.clientWidth, lpr.clientHeight);
+  }
+  function scaleLabel() {
+    var wrap = $("lblWrap"), pg = $("lblPage"); if (!wrap || !pg || !wrap.clientWidth) return;
+    var k = wrap.clientWidth / LBL_W;
+    pg.style.transform = "scale(" + k + ")";
+    wrap.style.height = Math.ceil(LBL_H * k) + "px";
+  }
+  function syncLblStyle() {
+    var box = $("lblStyle"); if (!box) return;
+    Array.prototype.forEach.call(box.querySelectorAll("button"), function (b) { b.classList.toggle("active", b.getAttribute("data-lst") === lblStyle); });
+  }
+  function drawLabel(c, id, it) {
+    var wrap = $("lblWrap"); if (!wrap || !it) return;
+    var seq = ++lblSeq, live = function () { return seq === lblSeq && document.body.contains(wrap); };
+    if (c + "-" + id !== lblCode) { lblCode = c + "-" + id; lblStyle = "normal"; }   // 別の 商品は 通常から
+    syncLblStyle();
+    if ($("lblPrint")) $("lblPrint").disabled = true;
+    loadQR().then(function () {
+      if (!live()) return;
+      wrap.innerHTML = '<div class="lbl-page" id="lblPage">' + labelHtml(c, id, it, qrData(c + "-" + id)) + "</div>";
+      fitLabel(c); scaleLabel();
+      if ($("lblPrint")) $("lblPrint").disabled = false;
+      if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { if (live()) { fitLabel(c); scaleLabel(); } });
+    }).catch(function (e) {
+      if (live()) wrap.innerHTML = '<div class="empty-msg">ラベルを 作れませんでした — 電波を 確かめて、もう一度 タブを 押して ください（' + esc((e && e.message) || e) + "）</div>";
+    });
+  }
+  function printLabel() {
+    var pg = $("lblPage"); if (!pg) return;
+    var out = $("lblOut");
+    if (!out) { out = document.createElement("div"); out.id = "lblOut"; document.body.appendChild(out); }
+    out.innerHTML = pg.outerHTML.replace(' id="lblPage"', "");
+    document.body.classList.add("lbl-printing");
+    setTimeout(function () { window.print(); }, 60);
+  }
+  window.addEventListener("afterprint", function () { document.body.classList.remove("lbl-printing"); });
+  window.addEventListener("resize", scaleLabel);
+  function showBusy(t) { $("busyT").textContent = t || "保存中…"; $("busy").classList.remove("hidden"); }
+  function hideBusy() { $("busy").classList.add("hidden"); }
 
   // ── カメラで 読む（jsQR は 使う 時だけ 読み込む）──
   var JSQR_SRC = "https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js";
@@ -1889,7 +2037,7 @@
 
   // ── 新しい 版が 出ていたら 読み直す（ホーム画面の アプリは 古い 版を しばらく 覚えている）──
   // 開いた 時だけ（カメラを 開いた 後に 読み直すと また 許可を 聞くので）。同じ 版へは 1回だけ（ループ しない）。
-  var VERSION = "2026-11-12b";
+  var VERSION = "2026-11-12c";
   $("verLbl").textContent = "版 " + VERSION;
   function checkUpdate() {
     if (!window.fetch) return;
