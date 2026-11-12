@@ -1842,7 +1842,7 @@
       (String(c) === "27" ? '<div class="lbl-style" id="lblStyle"><button type="button" data-lst="normal">通常</button><button type="button" data-lst="iriko">⚠ いりこ用</button></div>' : "") +
       '<div class="lbl-wrap" id="lblWrap"><div class="empty-msg">ラベルを 作って います…</div></div>' +
       '<button type="button" class="primary lbl-go" id="lblPrint" disabled>🖨 ラベル印刷</button>' +
-      (canShareFiles() ? '<div class="lbl-hint">共有 → 「Canon PRINT」を 選ぶ（A4 横・1枚の PDF）</div>' : "") + "</div>";
+      (canShareFiles() ? '<div class="lbl-hint">共有 → 「プリント」→ プリンター・Canon を 選ぶ（A4 横・1枚）</div>' : "") + "</div>";
   }
   function labelHtml(c, id, it, qr) {
     c = String(c);
@@ -1922,9 +1922,9 @@
     });
   }
   // ── PDF（A4 横・1枚）— 画面の ラベルを そのまま 絵に して 入れる。共有 → Canon PRINT など ──
-  var USE_SHARE = false;
+  var USE_SHARE = true;   // 共有 → プリント（PDF は A4 横・フッター なし）。12f・12g の 印刷は iPhone で 縦・フッター付き
   // iPhone / iPad: ラベルの PDF（A4 横）を 見えない 枠に 読み込んで おき、🖨 で その PDF を 印刷（試し・2026-11-12g）
-  var PDF_PRINT = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  var PDF_PRINT = false;   // 12g の 試し — iPhone では 効かなかった
   var lblFrameUrl = "";
   function loadPdfFrame(file) {
     var fr = $("lblFrame");
@@ -1937,7 +1937,7 @@
       setTimeout(res, 3000);
       lblFrameUrl = URL.createObjectURL(file); fr.src = lblFrameUrl;
     });
-  }   // 共有メニューは 使わない（2026-11-12f — ユーザーの 希望で 印刷に 戻す）
+  }
   function canShareFiles() {
     if (!USE_SHARE) return false;
     try { return !!(navigator.share && navigator.canShare && window.File && navigator.canShare({ files: [new File(["x"], "t.pdf", { type: "application/pdf" })] })); } catch (e) { return false; }
@@ -2165,7 +2165,7 @@
 
   // ── 新しい 版が 出ていたら 読み直す（ホーム画面の アプリは 古い 版を しばらく 覚えている）──
   // 開いた 時だけ（カメラを 開いた 後に 読み直すと また 許可を 聞くので）。同じ 版へは 1回だけ（ループ しない）。
-  var VERSION = "2026-11-12g";
+  var VERSION = "2026-11-12h";
   $("verLbl").textContent = "版 " + VERSION;
   function checkUpdate() {
     if (!window.fetch) return;
