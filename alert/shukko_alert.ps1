@@ -215,9 +215,9 @@ if ($Watch) {
 
 # ── 聞く（hello — 伝票 ＋ 音の 番）──
 $data = $null; $err = ""; $st0 = $null
-for ($i = 0; $i -lt 3 -and -not $data; $i++) {
-  try { $j = GetJson ($Base + "&act=hello") 90; if ($j.ok) { $data = $j; $st0 = $j.st } else { $err = [string]$j.error } }
-  catch { $err = $_.Exception.Message; if ($i -lt 2) { Start-Sleep -Seconds 20 } }
+for ($i = 0; $i -lt 2 -and -not $data; $i++) {   # 2回 まで（約 1分半）
+  try { $j = GetJson ($Base + "&act=hello") 40; if ($j.ok) { $data = $j; $st0 = $j.st } else { $err = [string]$j.error } }
+  catch { $err = $_.Exception.Message; if ($i -lt 1) { Start-Sleep -Seconds 10 } }
 }
 if ($Test) {
   function It($l, $i, $n, $q, $o) { [pscustomobject]@{ loc = $l; id = $i; name = $n; qty = $q; ok = $o } }

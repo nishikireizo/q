@@ -8,7 +8,7 @@ $Role = ([string]$Role).Trim().ToLower(); if (-not $Role) { $Role = "other" }
 $pr  = New-ScheduledTaskPrincipal -UserId ([Security.Principal.WindowsIdentity]::GetCurrent().Name) -LogonType Interactive -RunLevel Limited
 $ps  = Join-Path $Here "shukko_alert.ps1"
 foreach ($w in "1530", "1615") {
-  $act = New-ScheduledTaskAction -Execute "powershell.exe" -Argument ("-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"" + $ps + "`" -When " + $w)
+  $act = New-ScheduledTaskAction -Execute "wscript.exe" -Argument ("`"" + (Join-Path $Here "watch.vbs") + "`" -When " + $w)   # 黒い 窓 なし
   $trg = New-ScheduledTaskTrigger -Daily -At ($w.Substring(0, 2) + ":" + $w.Substring(2))
   $set = New-ScheduledTaskSettingsSet -StartWhenAvailable -ExecutionTimeLimit (New-TimeSpan -Hours 1) -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
   Register-ScheduledTask -TaskName ("Nishiki shukko alert " + $w) -Action $act -Trigger $trg -Settings $set -Principal $pr -Force | Out-Null
