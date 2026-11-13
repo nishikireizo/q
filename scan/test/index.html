@@ -1,0 +1,2470 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="スキャン">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#d7edfb">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex">
+<link rel="apple-touch-icon" href="../icon-180.png">
+
+<link rel="icon" href="../icon-180.png">
+<title>🧪 スキャン</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<!--
+  ニシキ冷蔵 — スキャン画面（ピッキング用・iPhone / Android の ホーム画面に 追加して 使う）
+  ・ラベルの QR「27-10001」（得意先-品番）を Bluetooth スキャナー か カメラで 読む。古い ラベル（アドレス）も 読める。
+  ・最初に 1回 ログイン → 端末トークンを この アプリの 中に 覚える（ホーム画面の アプリは Safari と 別に 覚える）。
+  ・得意先は ラベルで 決まる（選ばない）。はじめての 得意先は 1品 読む 間に 全部の 商品を 先読み → 次から すぐ 出る。
+  ・先読みで 出した あと 1品だけ サーバーで 確かめて 数を 直す。
+  ・データは Google Apps Script（?api=…）から。トークンが ないと 何も 返らない。値段は 来ない。
+  ・?d=デプロイID は メニュー「スキャン画面（スマホ）」の QR から 来る（この ページには 書かない）。
+-->
+<style>
+  :root {
+    color-scheme: light;
+    /* 色と形 — 商品ページ（product.html）と 同じ: 空色の 背景・深い 緑青・からし */
+    --bg: #d7edfb; --surface: #ffffff; --surface-2: #f1f8fc; --border: #cfe3ec;
+    --text: #23403a; --text-2: #4f6d66; --muted: #6e8a84;
+    --accent: #2f6b57; --accent-bg: #e5f2ee; --accent-mid: #b9dcd2;
+    --green: #2f6b57; --green-bg: #e5f2ee; --green-border: #b9dcd2;
+    --amber: #7a5a00; --amber-bg: #fbf1d4; --amber-border: #e0b038;
+    --red: #a9563f; --red-bg: #f9ebe5; --red-border: #e6b8a8;
+    --brown: #a88068; --radius: 18px; --mono: "DM Mono", ui-monospace, Menlo, monospace;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); }
+  body { font-family: "Noto Sans JP", -apple-system, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", system-ui, sans-serif;
+         font-size: 15px; line-height: 1.5; min-height: 100vh; }
+  .wrap { max-width: 520px; margin: 0 auto; padding: 0 0 32px; }
+  .hidden { display: none !important; }
+  button { font: inherit; color: var(--text); background: var(--surface); border: 1px solid var(--border);
+           border-radius: 10px; padding: 9px 12px; cursor: pointer; }
+  button:active { transform: scale(0.98); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  input[type=text], input[type=password], input[type=search] {
+    font: inherit; font-size: 16px; width: 100%; height: 46px; padding: 0 12px; color: var(--text);
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px; outline: none; }
+  input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-mid); }
+  .bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 16px; margin: 10px 12px 0;
+         background: var(--surface); border: 1px solid var(--border); border-radius: 14px; }
+  .bar + .bar { margin-top: 8px; }
+  .title { color: var(--accent); }
+  .title { font-size: 18px; font-weight: 700; }
+  .sub { font-size: 12px; color: var(--text-2); }
+  .pill { font-size: 12px; padding: 4px 10px; border-radius: 999px; white-space: nowrap; border: 1px solid transparent; }
+  .pill.on { background: var(--green-bg); color: var(--green); border-color: var(--green-border); }
+  .pill.off { background: var(--amber-bg); color: var(--amber); border-color: var(--amber-border); }
+  .sec { padding: 12px 16px; }
+  .box { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px; }
+  .msg { font-size: 14px; margin-top: 8px; min-height: 0; }
+  .msg.err { color: var(--red); }
+  .row { display: flex; justify-content: space-between; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+  .row:last-child { border-bottom: 0; }
+  .k { color: var(--text-2); white-space: nowrap; }
+  .v { text-align: right; }
+  .big { font-size: 34px; font-weight: 700; letter-spacing: 0.5px; line-height: 1.15; word-break: break-all; }
+  .tile { border-radius: 12px; padding: 10px 12px; background: var(--surface-2); border: 1px solid var(--border); }
+  .tile .k { font-size: 12px; }
+  .tile.ok { background: var(--green-bg); border-color: var(--green-border); color: var(--green); }
+  .tile.zero { background: var(--red-bg); border-color: var(--red-border); color: var(--red); }
+  .grid2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; margin: 12px 0; }
+  .scanrow { display: flex; gap: 8px; }
+  .scanrow input { flex: 1; min-width: 0; font-size: 17px; border-width: 2px; }
+  .iconbtn { width: 50px; flex: none; padding: 0; font-size: 20px; }
+  .iconbtn.on { background: var(--accent-bg); border-color: var(--accent); }
+  .card { margin: 0 12px 14px; border-radius: var(--radius); }
+  .card.flash { animation: fl 0.5s ease-out; }
+  @keyframes fl { from { box-shadow: 0 0 0 4px var(--accent-mid); } to { box-shadow: 0 0 0 0 transparent; } }
+  .card.warn { background: var(--red-bg); border-color: var(--red-border); }
+  .cl { display: inline-block; font-size: 12px; color: var(--text-2); background: var(--surface-2); border: 1px solid var(--border);
+        border-radius: 999px; padding: 2px 10px; margin-bottom: 6px; }
+  .cl.chg { color: var(--amber); background: var(--amber-bg); border-color: var(--amber-border); font-weight: 600; }
+  .state { font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .state.ok { color: var(--green); }
+  .state.upd { color: var(--amber); font-weight: 600; }
+  .recent-h { font-size: 12px; color: var(--text-2); padding: 0 16px 6px; }
+  .rec { display: grid; grid-template-columns: 48px minmax(0, 1fr) 70px 52px; gap: 6px; align-items: center;
+         padding: 9px 16px; border-top: 1px solid var(--border); font-size: 14px; background: var(--surface); }
+  .rec:active { background: var(--surface-2); }
+  .rec .t { font-size: 12px; color: var(--muted); }
+  .rec .n { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rec .s { text-align: right; font-weight: 600; }
+  .rec .s.zero { color: var(--red); }
+  .clist { margin-top: 10px; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: var(--surface); }
+  .citem { display: block; width: 100%; text-align: left; border: 0; border-bottom: 1px solid var(--border); border-radius: 0;
+           padding: 13px 14px; font-size: 16px; background: var(--surface); }
+  .citem:last-child { border-bottom: 0; }
+  .citem b { display: inline-block; min-width: 44px; color: var(--accent); }
+  .hint { text-align: center; color: var(--text-2); padding: 26px 10px; font-size: 14px; }
+  .foot { text-align: center; padding: 18px 16px 0; }
+  .link { background: none; border: 0; color: var(--text-2); font-size: 13px; text-decoration: underline; padding: 4px; }
+  /* カメラは 画面の 上に 開いた まま（連続 スキャン）— 下の カードで 結果が 見える */
+  .cam { position: relative; margin: 0 16px 12px; height: 38vh; min-height: 220px; max-height: 340px;
+         background: #000; border-radius: 14px; overflow: hidden; }
+  .cam video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .cam .frame { position: absolute; left: 50%; top: 45%; width: 58%; aspect-ratio: 1; max-height: 78%;
+                transform: translate(-50%, -50%); border: 3px solid rgba(255,255,255,0.85); border-radius: 16px;
+                transition: border-color 0.15s, box-shadow 0.15s; }
+  .cam.hit .frame { border-color: #22c55e; box-shadow: 0 0 0 4px rgba(34,197,94,0.35); }
+  .cam .camfoot { position: absolute; left: 0; right: 0; bottom: 0; padding: 8px 10px; display: flex; justify-content: space-between;
+                  align-items: center; gap: 8px; color: #fff; font-size: 13px; background: rgba(0,0,0,0.45); }
+  .cam .camfoot button { background: #fff; padding: 6px 12px; flex: none; }
+  /* ══ 商品カード — 商品ページ（product.html）と 同じ 形 ══ */
+  .hero { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px 12px;
+          box-shadow: 0 4px 14px rgba(35,64,58,.08); margin-bottom: 10px; }
+  .hero.warn { background: var(--red-bg); border-color: var(--red-border); }
+  .hero-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 12px; }
+  .hero-eyebrow { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 10px; letter-spacing: 3px;
+                  color: var(--muted); margin-bottom: 4px; }
+  .hero-eyebrow .state { letter-spacing: 0; font-size: 11px; }
+  .hero-client { font-size: 13px; font-weight: 700; color: var(--text-2); margin-bottom: 4px; }
+  .chg-tag { display: inline-block; font-size: 11px; font-weight: 700; color: var(--amber); background: var(--amber-bg);
+             border: 1px solid var(--amber-border); border-radius: 999px; padding: 0 8px; margin-left: 4px; }
+  .hero-number { font: 500 30px var(--mono); color: var(--accent); letter-spacing: 1px; line-height: 1.05; margin-bottom: 6px; word-break: break-all; }
+  .hero-name { font-size: 15px; font-weight: 700; line-height: 1.5; }
+  .stock-pill { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; min-width: 86px; padding: 10px 14px;
+                background: var(--accent-bg); border: 1px solid var(--accent-mid); border-radius: 14px; }
+  .stock-pill.low { background: var(--amber-bg); border-color: var(--amber-border); }
+  .stock-pill.zero { background: var(--red-bg); border-color: var(--red-border); }
+  .stock-num { font: 700 30px var(--mono); color: var(--accent); line-height: 1; }
+  .stock-pill.low .stock-num { color: var(--amber); }
+  .stock-pill.zero .stock-num { color: var(--red); }
+  .stock-label { font-size: 10px; font-weight: 700; letter-spacing: 1px; color: var(--muted); margin-top: 4px; }
+  .tab-nav { display: flex; gap: 3px; padding: 3px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); }
+  .tab-btn { flex: 1; border: none; border-radius: 9px; padding: 8px 4px; font-size: 13px; font-weight: 700; color: var(--text-2); background: none; }
+  .tab-btn.active { background: #fff; color: var(--accent); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+  .tab-n { display: inline-block; min-width: 18px; margin-left: 4px; padding: 0 5px; border-radius: 999px; background: var(--accent-bg);
+           color: var(--accent); font: 700 11px var(--mono); line-height: 17px; }
+  .tab-n:empty { display: none; }
+  .pane { display: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 4px 14px 14px;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+  .pane.active { display: block; }
+  .sec-head { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; color: var(--accent); letter-spacing: 1px; margin: 14px 0 8px; }
+  .sec-head::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+  .info-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+  .info-cell { background: var(--surface-2); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; min-width: 0; }
+  .info-cell.full { grid-column: 1 / -1; }
+  .info-key { font-size: 11px; font-weight: 700; letter-spacing: .5px; color: var(--muted); margin-bottom: 4px; }
+  .info-val { font-size: 15px; font-weight: 500; word-break: break-all; }
+  .info-cell.loc { background: var(--accent-bg); border-color: var(--accent-mid); }
+  .info-cell.loc .info-val { font: 700 30px var(--mono); color: var(--accent); line-height: 1.15; }
+  .info-cell.loc .info-val.empty { font-size: 15px; font-weight: 500; font-family: inherit; color: var(--amber); }
+  .yoyaku { display: flex; justify-content: space-between; align-items: center; gap: 10px; background: var(--amber-bg); border: 1px solid var(--amber-border);
+            border-radius: 10px; padding: 10px 14px; }
+  .yoyaku .yk { font-size: 10px; letter-spacing: 1.5px; color: var(--amber); margin-bottom: 2px; }
+  .yoyaku .yn { font: 700 18px var(--mono); color: var(--amber); }
+  .empty-msg { text-align: center; color: var(--muted); font-size: 13px; padding: 18px 0; }
+  .pane-foot { display: flex; justify-content: space-between; gap: 8px; margin-top: 12px; }
+  .refresh-btn { border-radius: 10px; border: 1px solid var(--accent-mid); background: #fff; color: var(--accent); font-size: 12px; font-weight: 700; padding: 7px 12px; }
+  .updated-ts { font: 10px var(--mono); color: var(--muted); text-align: center; margin-top: 12px; }
+  .loc-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; background: var(--surface-2); border: 1px solid var(--border);
+             border-radius: 12px; padding: 10px 14px; margin-bottom: 6px; }
+  .loc-row.current { background: var(--accent-bg); border-color: var(--accent-mid); }
+  .loc-name { font: 500 15px var(--mono); white-space: pre-line; word-break: break-all; }
+  .loc-row.current .loc-name.big { font-size: 26px; font-weight: 700; color: var(--accent); }
+  .loc-date { font-size: 11px; color: var(--muted); }
+  .loc-edit-btn { flex: none; border-radius: 10px; border: 1px solid var(--accent-mid); background: #fff; font-size: 13px; font-weight: 700; padding: 7px 10px; }
+  .badge { font-size: 10px; padding: 2px 8px; border-radius: 20px; font-weight: 700; }
+  .badge-blue { background: var(--accent-bg); color: var(--accent); border: 1px solid var(--accent-mid); }
+  .badge-move { background: var(--accent); color: #fff; border: 1px solid var(--accent); }
+  /* 記録 — 商品ページの 表と 同じ 中身を スマホの 幅で（横に 動かさない）: 日付 | 内容（引取先・運送・担当・伝票）| 数・残り */
+  .kv-h, .kv { display: grid; grid-template-columns: 56px minmax(0, 1fr) auto; gap: 8px; align-items: start; }
+  .kv-h { font-size: 11px; font-weight: 700; color: var(--muted); padding: 0 2px 5px; border-bottom: 1px solid var(--border); }
+  .kv-h span:last-child { text-align: right; }
+  .kv { padding: 8px 2px; border-bottom: 1px solid #edf3f6; font-size: 13px; font-weight: 500; }
+  .kv:last-child { border-bottom: 0; }
+  .kv-d { font: 500 12px var(--mono); color: var(--text-2); line-height: 1.35; }
+  .kv-d span { display: block; color: var(--muted); font-size: 11px; }
+  .kv-k { line-height: 1.45; word-break: break-word; }
+  .kv-k b { font-family: var(--mono); }
+  .kv-sub { font-size: 11px; color: var(--muted); margin-top: 2px; word-break: break-word; }
+  .kv-n { text-align: right; font-family: var(--mono); white-space: nowrap; line-height: 1.35; }
+  .kv-n .kv-q { display: block; font-size: 14px; font-weight: 500; }
+  .kv-n .kv-left { display: block; font-size: 11px; color: var(--muted); }
+  .kv.cx .kv-d, .kv.cx .kv-k, .kv.cx .kv-n { color: var(--muted); text-decoration: line-through; }
+  .kv.cx .kr-tag { text-decoration: none; }
+  .k-in { color: var(--accent); font-weight: 700; }
+  .k-out { color: var(--text); font-weight: 700; }
+  .k-kp { color: var(--brown); font-weight: 700; }
+  .k-move { color: var(--accent); font-weight: 700; }
+  .k-loc { color: var(--brown); font-weight: 500; }
+  .k-fix { color: var(--red); font-weight: 700; }
+  .kr-tag { display: inline-block; font-size: 10.5px; font-weight: 700; border-radius: 5px; padding: 0 6px; background: #eef1f4; color: var(--muted); }
+  .kr-tag.yy { background: var(--amber-bg); color: var(--amber); }
+  .ver { font: 10px var(--mono); color: var(--muted); margin-top: 6px; }
+  /* ══ メニュー ══ */
+  .backbtn { flex: none; width: 40px; height: 40px; padding: 0; font-size: 20px; font-weight: 700; color: var(--accent); border-color: var(--accent-mid); }
+  .menu { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; padding: 12px; }
+  .tile { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-height: 128px; padding: 16px; text-align: left;
+          background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 4px 14px rgba(35,64,58,.08); }
+  .tile .ti { font-size: 30px; line-height: 1; }
+  .tile b { font-size: 20px; color: var(--accent); }
+  .tile span:last-child { font-size: 12px; color: var(--text-2); line-height: 1.4; }
+  .tile.soon { opacity: .55; box-shadow: none; }
+  /* ══ 出庫 ピッキング ══ */
+  #pickView { padding: 0 12px; }
+  #pickView.open #pickList, #pickView:not(.open) #pickSlip { display: none; }   /* スマホ: 一覧 か 伝票 の どちらか */
+  .pk-empty { text-align: center; color: var(--text-2); font-size: 15px; line-height: 1.7; padding: 60px 20px; background: var(--surface);
+              border: 1px dashed var(--accent-mid); border-radius: var(--radius); }
+  .pk-empty b { display: block; font-size: 36px; color: var(--accent-mid); margin-bottom: 6px; }
+  .pk-date { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 0 0 8px; }
+  .pk-date b { font-size: 15px; }
+  .pk-sum { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--text-2); margin: 4px 2px 6px; }
+  .pk-sum .err { color: var(--red); }
+  .pk-hint { font-size: 12px; color: var(--muted); margin: 0 2px 8px; }
+  .slip { display: block; width: 100%; text-align: left; margin-bottom: 8px; padding: 12px 14px; background: var(--surface);
+          border: 1px solid var(--border); border-radius: 14px; }
+  .slip.done { background: var(--surface-2); opacity: .55; }
+  .slip.done .slip-cl, .slip.done .slip-time { color: var(--muted); }
+  .slip-top { display: flex; align-items: baseline; gap: 10px; }
+  .slip-time { font: 500 15px var(--mono); color: var(--text-2); flex: none; }
+  .slip-cl { flex: 1; min-width: 0; font-size: 16px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .slip-n { flex: none; font: 700 14px var(--mono); color: var(--muted); }
+  .slip-n.mid { color: var(--amber); }
+  .slip-n.ok { color: var(--accent); font-family: inherit; }
+  .slip-sub { font-size: 12px; color: var(--text-2); margin: 3px 0 7px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pbar { height: 5px; border-radius: 3px; background: var(--surface-2); border: 1px solid var(--border); overflow: hidden; }
+  .pbar i { display: block; height: 100%; background: var(--accent); }
+  .pbar.big { height: 8px; margin-top: 2px; }
+  .pk-cl { font-family: inherit; font-size: 22px; font-weight: 700; letter-spacing: 0; }
+  .pk-msg { margin: 0 0 10px; padding: 11px 14px; border-radius: 12px; font-size: 14px; font-weight: 700; line-height: 1.5; border: 1px solid; }
+  .pk-msg.ok { background: var(--accent-bg); border-color: var(--accent-mid); color: var(--accent); }
+  .pk-msg.warn { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber); }
+  .pk-msg.bad { background: var(--red-bg); border-color: var(--red-border); color: var(--red); font-size: 15px; }
+  .pk-code { display: inline-block; font: 500 12px var(--mono); padding: 0 6px; margin-right: 6px; border-radius: 5px; background: rgba(255,255,255,.7); }
+  .pk-done { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin: 0 0 10px; padding: 14px; border-radius: 14px;
+             background: var(--accent); color: #fff; font-size: 16px; font-weight: 700; }
+  .pk-lines { padding-bottom: 6px; }
+  .pl { display: grid; grid-template-columns: 88px minmax(0, 1fr) auto 26px; gap: 8px; align-items: center; padding: 10px 2px;
+        border-bottom: 1px solid #edf3f6; cursor: pointer; }
+  .pl.last { background: var(--accent-bg); border-radius: 10px; }
+  .pl-loc { font: 700 20px var(--mono); color: var(--accent); line-height: 1.1; word-break: break-all; }
+  .pl-id { font: 500 14px var(--mono); }
+  .pl-name { font-size: 13px; font-weight: 500; line-height: 1.4; word-break: break-word; }
+  .pl-in { font-size: 11px; color: var(--muted); }
+  .pl-fifo { margin-top: 4px; font-size: 12px; font-weight: 700; color: var(--amber); background: var(--amber-bg); border: 1px solid var(--amber-border);
+             border-radius: 8px; padding: 3px 7px; line-height: 1.45; }
+  .pl-qty { text-align: right; line-height: 1.1; }
+  .pl-qty b { display: block; font: 700 22px var(--mono); }
+  .pl-qty span { font-size: 11px; color: var(--muted); }
+  .pl-st { width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--border); text-align: center; font: 700 15px/22px inherit; color: #fff; }
+  .pl.ok .pl-st { background: var(--accent); border-color: var(--accent); }
+  .pl.ok .pl-loc, .pl.ok .pl-name, .pl.ok .pl-id, .pl.ok .pl-qty b { color: var(--muted); }
+  .pk-foot { text-align: center; padding-top: 10px; }
+  .pk-q { margin: 0 0 10px; padding: 8px 12px; border-radius: 10px; font-size: 13px; font-weight: 700; background: var(--amber-bg); color: var(--amber); border: 1px dashed var(--amber-border); }
+  .slip-who { color: var(--accent); font-weight: 700; }
+  .slip-tag { flex: none; font-size: 11px; font-weight: 700; color: var(--amber); background: var(--amber-bg); border: 1px solid var(--amber-border);
+              border-radius: 999px; padding: 0 8px; line-height: 18px; }
+  .pk-sep { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; color: var(--muted); margin: 14px 2px 8px; }
+  .pk-sep::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+  /* ══ 🚚 積み込み（出庫 確定）— 積み込み待ち = 青、出庫済み = 緑 ══ */
+  :root { --blue: #1d5f8a; --blue-bg: #e3f0fa; --blue-border: #9cc6e6; }
+  .ld { margin: 0 0 10px; padding: 14px; border-radius: 16px; background: var(--blue-bg); border: 2px solid var(--blue-border); }
+  .ld-t { font-size: 17px; font-weight: 700; color: var(--blue); }
+  .ld-s { font-size: 13px; color: var(--text-2); margin: 2px 0 10px; }
+  .ld-btn { width: 100%; height: 64px; border-radius: 14px; border: 0; background: var(--blue); color: #fff; font-size: 20px; font-weight: 700; }
+  .shipped { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin: 0 0 10px; padding: 14px; border-radius: 14px;
+             background: var(--accent); color: #fff; font-size: 17px; font-weight: 700; }
+  .shipped small { display: block; font-size: 12px; font-weight: 500; opacity: .9; }
+  .shipped button { flex: none; background: #fff; color: var(--accent); font-size: 12px; font-weight: 700; padding: 6px 10px; }
+  .pl.gone { opacity: .55; }
+  .slip-tag.ld { background: var(--blue-bg); color: var(--blue); border-color: var(--blue-border); }
+  .slip-tag.sh { background: var(--accent-bg); color: var(--accent); border-color: var(--accent-mid); }
+  .slip.ldw { border: 2px solid var(--blue-border); }
+  .pop.ask .pop-card { border-color: var(--blue); }
+  .pop.ask .pop-ic { background: var(--blue); font-size: 64px; }
+  .pop.ask .pop-t { color: var(--blue); }
+  /* 数の 確認 — パレットごとに 段 × 1段の 数 ＋ バラ（2026-11-13）*/
+  .qty-card { max-height: 96vh; overflow-y: auto; }
+  .qa-code { font-size: 12px; color: #6b7280; }
+  .qa-need { margin-top: 10px; border-radius: 16px; background: #1d5f8a; color: #fff; padding: 8px 12px 10px; display: flex; align-items: baseline; justify-content: center; gap: 10px; }
+  .qa-need small { font-size: 15px; font-weight: 700; opacity: .9; }
+  .qa-need b { font-size: 54px; font-weight: 800; line-height: 1; }
+  .qa-need span { font-size: 20px; font-weight: 700; }
+  .qa-need em { font-style: normal; font-size: 13px; opacity: .9; align-self: center; }
+  .qty-card .pop-t { font-size: 20px; }
+  .qa-done { text-align: left; font-size: 14px; line-height: 1.6; margin-top: 8px; }
+  .qa-done:empty { display: none; }
+  .qa-done div { background: #e7f2ee; border-radius: 10px; padding: 4px 10px; margin-top: 4px; }
+  .qa-h { display: flex; align-items: baseline; justify-content: space-between; margin-top: 12px; }
+  .qa-h b { font-size: 18px; color: var(--blue); }
+  .qa-f { display: flex; align-items: flex-end; justify-content: center; gap: 6px; margin-top: 8px; }
+  .qa-f .bx { flex: 1; max-width: 110px; border: 3px solid #c8d3cf; border-radius: 14px; background: #fff; padding: 4px 4px 8px; font: inherit; color: inherit; cursor: pointer; }
+  .qa-f .bx.on { border-color: var(--blue); background: #eef4ff; }
+  .qa-f .bx small { display: block; font-size: 12px; color: #6b7280; }
+  .qa-f .bx b { display: block; font-size: 34px; font-weight: 800; line-height: 1.15; min-height: 39px; }
+  .qa-f .op { font-size: 24px; font-weight: 800; color: #6b7280; padding-bottom: 14px; }
+  .qa-r { margin-top: 10px; border-radius: 12px; padding: 8px 10px; font-size: 17px; font-weight: 800; background: #f1f4f3; color: #6b7280; }
+  .qa-r.ok { background: #e7f2ee; color: #2f6b5a; }
+  .qa-r.less { background: #fff5cf; color: #7a5d00; }
+  .qa-r.over { background: #fde8e6; color: #b3261e; }
+  .qa-keys { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; }
+  .qa-keys button { padding: 12px 0; font-size: 24px; font-weight: 700; border-radius: 12px; border: 2px solid #c8d3cf; background: #fff; color: inherit; cursor: pointer; }
+  .qa-keys button:active { background: #eef4ff; }
+  .qa-keys button.fn { font-size: 16px; background: #f1f4f3; }
+  #qaGo:disabled { opacity: .4; }
+  .pl.part .pl-st { font-size: 14px; font-weight: 800; color: #7a5d00; white-space: nowrap; }
+  .pl.part { border-color: #e8c64a; background: #fffbea; }
+  .pl-pal { font-size: 12px; color: #7a5d00; font-weight: 700; }
+  /* 伝票 一覧 — 得意先ごと・その 中は 担当者 か 引取先 ごと（2026-11-13）*/
+  .pk-g { margin: 16px 0 6px; padding: 6px 12px; border-radius: 10px; background: #2f6b5a; color: #fff; font-size: 16px; font-weight: 800; display: flex; justify-content: space-between; align-items: baseline; }
+  .pk-g span { font-weight: 500; font-size: 13px; opacity: .9; }
+  .pk-g2 { margin: 8px 0 4px 4px; font-size: 14px; font-weight: 800; color: #2f6b5a; }
+  .pk-g2 small { font-weight: 500; color: #6b7280; margin-right: 6px; }
+  .slip-pick .sp-n { font-size: 13px; color: #6b7280; margin-top: 4px; }
+  /* 同じ 品番が 2枚 以上の 伝票に ある 時 — 伝票を 選ぶ（2026-11-12）*/
+  .slip-pick { display: flex; flex-direction: column; gap: 10px; margin: 12px 0 4px; max-height: 52vh; overflow-y: auto; text-align: left; }
+  .slip-pick button { display: block; width: 100%; text-align: left; background: #fff; border: 2px solid var(--blue); border-radius: 14px; padding: 12px 14px; font: inherit; color: inherit; cursor: pointer; }
+  .slip-pick button:active { background: #eef4ff; }
+  .slip-pick .sp-top { display: flex; align-items: baseline; gap: 8px; font-size: 18px; font-weight: 800; }
+  .slip-pick .sp-top .sp-qty { margin-left: auto; white-space: nowrap; color: var(--blue); }
+  .slip-pick .sp-row { display: flex; gap: 8px; margin-top: 5px; font-size: 15px; line-height: 1.35; }
+  .slip-pick .sp-row span { flex: 0 0 4.2em; color: #6b7280; font-size: 13px; padding-top: 1px; }
+  .slip-pick .sp-row b { font-weight: 700; min-width: 0; overflow-wrap: anywhere; }
+  .slip-pick .sp-prog { margin-top: 6px; font-size: 13px; color: #6b7280; }
+  .pop-btns { display: grid; grid-template-columns: 1fr 1.6fr; gap: 10px; margin-top: 18px; }
+  .pop-btns button { height: 58px; font-size: 19px; font-weight: 700; border-radius: 14px; }
+  .pop-btns .go { background: var(--blue); border-color: var(--blue); color: #fff; }
+  .lines-mini { text-align: left; margin-top: 10px; font-size: 14px; background: var(--surface-2); border-radius: 12px; padding: 8px 12px; }
+  .lines-mini div { display: flex; justify-content: space-between; gap: 10px; padding: 3px 0; }
+  .pk-alert { margin: 0 0 10px; padding: 12px 14px; border-radius: 14px; background: var(--red-bg); border: 2px solid #c8432b; color: var(--red);
+              font-size: 15px; font-weight: 700; line-height: 1.5; }
+  .pk-alert span { display: block; font-size: 13px; font-weight: 500; color: var(--text); }
+  /* ══ 🏷 ラベル（A4 横・1枚。大きさは 決まり）══ */
+  .lbl-style { display: flex; gap: 6px; margin: 10px 0; }
+  .lbl-style button { flex: 1; padding: 10px; border-radius: 12px; font-weight: 700; }
+  .lbl-style button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .lbl-style button.active[data-lst="iriko"] { background: #fbd94f; border-color: #e0b800; color: #5c4600; }
+  .lbl-wrap { position: relative; overflow: hidden; margin: 10px 0 12px; border: 2px solid #ccc; border-radius: 8px; background: #fff; min-height: 60px; }
+  .lbl-go { width: 100%; padding: 14px; font-size: 17px; border-radius: 14px; }
+  .lbl-hint { margin-top: 6px; font-size: 12px; color: var(--muted); text-align: center; }
+  .lbl-page { width: 1047px; height: 718px; transform-origin: 0 0; display: flex; flex-direction: column; padding: 8px 11px; box-sizing: border-box;
+              overflow: hidden; background: #fff; color: #000; font-family: "Noto Sans JP", sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .lbl-page .lt { display: flex; align-items: center; gap: 2%; flex: 0 0 24%; min-height: 0; }
+  .lbl-page .lcw { flex: 1; min-width: 0; height: 100%; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  .lbl-page .lc { font-weight: 600; letter-spacing: .12em; text-align: center; line-height: 1; white-space: nowrap; }
+  .lbl-page .lr { height: 3px; background: #000; margin: 11px 0; flex-shrink: 0; }
+  .lbl-page .lpr { flex: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; min-height: 0; }
+  .lbl-page .lp { font-weight: 700; text-align: center; line-height: 1.12; width: 100%; }
+  .lbl-page .lb { display: flex; justify-content: space-between; align-items: flex-end; flex-shrink: 0; }
+  .lbl-page .lbn { display: grid; grid-template-columns: 1fr auto 1fr; align-items: start; gap: 2%; flex-shrink: 0; }
+  .lbl-page .ldt { font-weight: 600; color: #444; line-height: 1.2; font-size: 45px; }
+  .lbl-page .ly { font-weight: 600; color: #000; font-size: 57px; }
+  .lbl-page .lbig, .lbl-page .lnum { font-weight: 700; line-height: .85; font-size: 204px; }
+  .lbl-page .lunit { font-weight: 700; font-size: 57px; }
+  .lbl-page .lq { flex-shrink: 0; width: 90px; height: 90px; }
+  .lbl-page .lq img { width: 100%; height: 100%; display: block; }
+  .lbl-page .lt .lq { margin-right: 38px; }
+  #lblOut { display: none; }
+  @media print {
+    @page { size: A4 landscape; margin: 0; }   /* 余白 0 = ブラウザの ヘッダー・フッター（アドレス・日付）を 出さない */
+    html, body.lbl-printing { background: #fff !important; margin: 0 !important; padding: 0 !important; }
+    body.lbl-printing > :not(#lblOut) { display: none !important; }
+    body.lbl-printing #lblOut { display: block; padding: 0.5cm; box-sizing: border-box; }
+    body.lbl-printing #lblOut .lbl-img { display: block; width: 100%; height: auto; }
+    body.lbl-printing #lblOut .lbl-page { width: 277mm; height: 190mm; margin: 0 auto; transform: none !important; }
+  }
+
+  /* 保存中（場所の 変更）*/
+  .busy-card { padding: 26px 22px; }
+  .spin { width: 56px; height: 56px; margin: 4px auto 14px; border: 6px solid #d6e6e2; border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  /* ══ 出庫: 同じ 列・合計・手チェック（2026-11-12）══ */
+  .row-strip { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; background: #fff5cf; border: 2px solid #e8c64a; border-radius: 12px;
+               padding: 10px 12px; font: inherit; font-weight: 700; font-size: 15px; color: #5c4600; margin: 0 0 10px; cursor: pointer; }
+  .row-strip span { margin-left: auto; font-size: 13px; }
+  .pl.hand .pl-st { background: #8a6d00; border-color: #8a6d00; font-size: 12px; }
+  #popX:empty { display: none; }
+  #pop .pop-card { max-height: 94vh; overflow-y: auto; }
+  .px { text-align: left; border-radius: 12px; padding: 9px 11px; margin-top: 10px; font-size: 14px; line-height: 1.55; }
+  .px.sum { background: var(--accent-bg); }
+  .px.same { background: #fff5cf; border: 2px solid #e8c64a; }
+  .px-h { font-size: 12px; font-weight: 700; color: #6b7280; }
+  .px b { font-size: 16px; }
+  .px-d { font-size: 12px; color: #7a5d00; font-weight: 700; }
+  .hand-card { border-color: #8a6d00; }
+  .pop-btns .hand-go { background: #8a6d00; border-color: #8a6d00; color: #fff; }
+  .rl-list { max-height: 55vh; overflow-y: auto; text-align: left; margin: 10px 0 4px; }
+  .rl-it { border: 1px solid var(--border); border-radius: 12px; padding: 9px 11px; margin-top: 8px; }
+  .rl-it.here { border: 2px solid var(--blue); background: var(--blue-bg); }
+  .rl-top { display: flex; gap: 8px; align-items: baseline; }
+  .rl-top span { margin-left: auto; font-weight: 800; font-size: 17px; white-space: nowrap; }
+  .rl-who { font-size: 13px; color: #6b7280; }
+  /* ══ スキャン結果の ポップアップ ══ */
+  .pop { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; padding: 20px;
+         background: rgba(20, 40, 35, .45); }
+  .pop-card { width: min(100%, 440px); background: #fff; border-radius: 24px; padding: 28px 22px 22px; text-align: center;
+              box-shadow: 0 18px 50px rgba(0,0,0,.25); border: 4px solid var(--accent); animation: popin .16s ease-out; }
+  @keyframes popin { from { transform: scale(.85); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  .pop-ic { width: 128px; height: 128px; margin: 0 auto 12px; border-radius: 50%; background: var(--accent); color: #fff;
+            font: 700 84px/128px "Noto Sans JP", system-ui, sans-serif; }
+  .pop-code { font: 500 14px var(--mono); color: var(--muted); }
+  .pop-t { font-size: 22px; font-weight: 700; line-height: 1.45; margin-top: 4px; word-break: break-word; white-space: pre-line; }
+  .pop-s { font-size: 15px; font-weight: 500; line-height: 1.55; margin-top: 6px; color: var(--text-2); word-break: break-word; }
+  .pop-s:empty { display: none; }
+  .pop-ok { width: 100%; height: 58px; margin-top: 18px; font-size: 22px; border-radius: 14px; }
+  .pop.ok .pop-t { color: var(--accent); }
+  .pop.bad .pop-card { border-color: var(--red); }
+  .pop.bad .pop-ic { background: #c8432b; }
+  .pop.bad .pop-t { color: var(--red); }
+  .pop.bad .pop-ok { background: #c8432b; border-color: #c8432b; }
+  .pop.warn .pop-card { border-color: var(--amber-border); }
+  .pop.warn .pop-ic { background: #d9a21b; }
+  .pop.warn .pop-t { color: var(--amber); }
+  .pop.warn .pop-ok { background: #b8860b; border-color: #b8860b; }
+  .pop-card.shake { animation: shake .3s; }
+  @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-10px); } 75% { transform: translateX(10px); } }
+  /* ══ タブレット（幅 700px 以上・iPad / Android タブレット・スマホの 横向き）══
+     左 = 得意先・スキャン欄・カメラ・一覧（伝票 / 最近）、右 = 開いた 伝票 / 商品カード */
+  @media (min-width: 700px) {
+    body { font-size: 16px; }
+    .wrap { max-width: 1280px; padding: 0 10px 40px; }
+    #vSetup, #vLogin { max-width: 560px; margin: 0 auto; }
+    .bar { margin: 12px 6px 0; }
+    .menu { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; padding: 16px 6px; }
+    .menu .tile { min-height: 200px; padding: 24px 22px; gap: 8px; }
+    .menu .tile .ti { font-size: 44px; }
+    .menu .tile b { font-size: 26px; }
+    .menu .tile span:last-child { font-size: 14px; }
+    #workView { display: grid; grid-template-columns: minmax(280px, 34%) minmax(0, 1fr); grid-template-rows: auto 1fr; column-gap: 6px; align-items: start; }
+    #lookupView, #pickView { display: contents; }
+    .wv-side { grid-column: 1; grid-row: 1; }
+    #recentBox, #pickList { grid-column: 1; grid-row: 2; }
+    #card, #pickSlip { grid-column: 2; grid-row: 1 / span 2; margin: 12px 6px 14px; }
+    #pickList { padding: 0 6px; }
+    #pickView.open #pickList, #pickView:not(.open) #pickSlip { display: block; }
+    #recentBox { margin: 0 6px; border-radius: 14px; overflow: hidden; }
+    .recent-h { padding: 0 10px 6px; }
+    .slip.cur { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-mid); }
+    .pk-date .refresh-btn { white-space: nowrap; flex: none; padding: 7px 10px; }
+    .pk-date b { text-align: center; font-size: 14px; }
+    .pk-hero .hero-number { font-size: 26px; }
+    .pl { grid-template-columns: 124px minmax(0, 1fr) auto 32px; gap: 12px; padding: 12px 6px; }
+    .pl-loc { font-size: 26px; }
+    .pl-id { font-size: 15px; }
+    .pl-name { font-size: 16px; }
+    .pl-in, .pl-fifo { font-size: 13px; }
+    .pl-qty b { font-size: 26px; }
+    .pl-st { width: 32px; height: 32px; font-size: 17px; line-height: 28px; }
+    .pk-msg { font-size: 16px; }
+    .info-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+    .cam { margin: 0 6px 12px; }
+    .sec { padding: 12px 6px; }
+  }
+  @media (max-width: 360px) { .hero-number, .stock-num { font-size: 24px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- セットアップ（?d= が 無い） -->
+  <div id="vSetup" class="hidden">
+    <div class="bar"><div class="title">スキャン</div></div>
+    <div class="sec"><div class="box">
+      <b>セットアップ用 QR から 開いてください</b>
+      <p class="sub" style="font-size:14px">PC の メニュー「スキャン画面（スマホ）」に 出る QR を スマホの カメラで 読む。<br>iPhone: Safari で 開く → 共有 → ホーム画面に追加<br>Android: Chrome で 開く → ⋮ → ホーム画面に追加（アプリを インストール）</p>
+    </div></div>
+  </div>
+
+  <!-- ログイン（1回だけ） -->
+  <div id="vLogin" class="hidden">
+    <div class="bar"><div><div class="title">スキャン</div><div class="sub">この 端末を 登録します（1回だけ）</div></div></div>
+    <div class="sec"><form class="box" id="loginForm" autocomplete="on">
+      <label class="sub" for="lgUser">名前</label>
+      <input type="text" id="lgUser" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false">
+      <div style="height:10px"></div>
+      <label class="sub" for="lgPass">パスワード</label>
+      <input type="password" id="lgPass" autocomplete="current-password">
+      <div class="msg err" id="lgErr"></div>
+      <button type="submit" class="primary" id="lgBtn" style="width:100%;margin-top:12px;height:48px">ログイン して 登録</button>
+      <p class="sub" style="margin:10px 0 0">商品ページ（QR）の ログインと 同じ 名前・パスワード。登録は 90日 有効。</p>
+    </form></div>
+  </div>
+
+  <!-- スキャン -->
+  <div id="vMain" class="hidden">
+    <div class="bar">
+      <div style="display:flex;align-items:center;gap:10px;min-width:0">
+        <button type="button" class="backbtn hidden" id="backBtn" aria-label="もどる">←</button>
+        <div style="min-width:0"><div class="title" id="mnTitle">メニュー</div><div class="sub" id="mnUser"></div></div>
+      </div>
+      <span class="pill off hidden" id="mnPill">タップで スキャン待ち</span>
+    </div>
+    <!-- メニュー -->
+    <div id="homeView">
+      <div class="menu">
+        <button type="button" class="tile" data-mode="shukko"><span class="ti">🚚</span><b>出庫</b><span>ピッキング・先入れ先出し</span></button>
+        <button type="button" class="tile soon" data-mode="nyuko"><span class="ti">📦</span><b>入庫</b><span>部屋・場所の 入力（準備中）</span></button>
+        <button type="button" class="tile soon" data-mode="tana"><span class="ti">📋</span><b>棚卸</b><span>（準備中）</span></button>
+        <button type="button" class="tile" data-mode="lookup"><span class="ti">🔍</span><b>在庫 検索</b><span>ラベルで 場所・在庫・記録</span></button>
+      </div>
+      <div class="msg" id="homeMsg" style="text-align:center"></div>
+    </div>
+    <div id="workView" class="hidden">
+    <div class="wv-side">
+    <div class="bar" id="clientBar" style="padding:10px 16px">
+      <div style="min-width:0">
+        <div class="sub">得意先（ラベルで 決まる）</div>
+        <div style="font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" id="mnClient"></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;flex:none">
+        <span class="sub" id="mnList"></span>
+        <button type="button" id="mnReload" aria-label="先読みを やり直す" style="padding:6px 9px">↻</button>
+      </div>
+    </div>
+    <div class="sec">
+      <div class="scanrow">
+        <input type="text" id="scanIn" inputmode="none" enterkeyhint="go" placeholder="スキャン待ち…"
+               autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+        <button type="button" class="iconbtn" id="kbBtn" aria-label="キーボードで 打つ" title="キーボードで 打つ">⌨</button>
+        <button type="button" class="iconbtn" id="camBtn" aria-label="カメラで 読む" title="カメラで 読む">📷</button>
+      </div>
+      <div class="msg err" id="scanErr"></div>
+    </div>
+    <!-- カメラ（📷 で 開く・閉じるまで 開いた まま）-->
+    <div class="cam hidden" id="cam">
+      <video id="camVideo" playsinline muted autoplay></video>
+      <div class="frame"></div>
+      <div class="camfoot"><span id="camMsg">QR を 枠に 入れて ください</span><button type="button" id="camClose">閉じる</button></div>
+    </div>
+    </div>
+    <div id="lookupView">
+      <div class="box card" id="card"></div>
+      <div id="recentBox"><div class="recent-h" id="recentH"></div><div id="recent"></div></div>
+    </div>
+    <div id="pickView" class="hidden"><div id="pickList"></div><div id="pickSlip"></div></div>
+    </div>
+    <!-- スキャン結果（出庫）: ✓ は 1秒ちょっとで 消える。✕・⚠ は OK を 押すまで 残る（その 間の スキャンは 受けない）-->
+    <div id="busy" class="pop hidden" role="status" aria-live="polite">
+      <div class="pop-card busy-card"><div class="spin"></div><div class="pop-t" id="busyT">保存中…</div></div>
+    </div>
+    <div id="pop" class="pop hidden" role="alertdialog" aria-live="assertive">
+      <div class="pop-card"><div class="pop-ic" id="popIc"></div><div class="pop-code" id="popCode"></div>
+        <div class="pop-t" id="popT"></div><div class="pop-s" id="popS"></div><div id="popX"></div>
+        <button type="button" class="primary pop-ok" id="popOk">OK</button></div>
+    </div>
+    <div id="shipAsk" class="pop ask hidden" role="dialog">
+      <div class="pop-card"><div class="pop-ic">🚚</div><div class="pop-t">出庫を 確定しますか？</div><div class="pop-s" id="shipS"></div>
+        <div class="lines-mini" id="shipL"></div>
+        <div class="pop-btns"><button type="button" id="shipNo">もどる</button><button type="button" class="go" id="shipGo">確定する</button></div></div>
+    </div>
+    <div id="handAsk" class="pop ask hidden" role="dialog">
+      <div class="pop-card hand-card"><div class="pop-t" id="handT"></div><div class="pop-s" id="handS"></div>
+        <div class="pop-btns"><button type="button" id="handNo">やめる</button><button type="button" class="go hand-go" id="handYes">確かめた ✓</button></div></div>
+    </div>
+    <div id="qtyAsk" class="pop ask hidden" role="dialog">
+      <div class="pop-card qty-card"><div class="qa-code" id="qaCode"></div><div class="pop-t" id="qaT"></div><div class="pop-s" id="qaS"></div>
+        <div class="qa-need" id="qaNeed"></div><div class="qa-done" id="qaDone"></div>
+        <div class="qa-h"><b id="qaP"></b><button type="button" class="link" id="qaMode"></button></div>
+        <div class="qa-f" id="qaF"></div>
+        <div class="qa-r" id="qaR"></div>
+        <div class="qa-keys" id="qaKeys"></div>
+        <div class="pop-btns"><button type="button" id="qaNo">やめる</button><button type="button" class="go" id="qaGo"></button></div></div>
+    </div>
+    <div id="rowList" class="pop ask hidden" role="dialog">
+      <div class="pop-card"><div class="pop-t" id="rowListT"></div><div class="pop-s">同じ 得意先の きょうの 伝票（出庫済みは 除く）</div>
+        <div class="rl-list" id="rowListL"></div>
+        <div class="pop-btns"><button type="button" id="rowListX">閉じる</button></div></div>
+    </div>
+    <div id="slipAsk" class="pop ask hidden" role="dialog">
+      <div class="pop-card"><div class="pop-t" id="slipAskT">どの 伝票ですか？</div><div class="pop-s" id="slipAskS"></div>
+        <div class="slip-pick" id="slipAskL"></div>
+        <div class="pop-btns"><button type="button" id="slipAskNo">やめる</button></div></div>
+    </div>
+    <div class="foot"><button type="button" class="link" id="logoutBtn">この 端末の ログインを やめる</button><div class="ver" id="verLbl"></div></div>
+  </div>
+</div>
+
+
+<!-- LOCPAD START — 場所の 入力（システムの loc_pad.html と 同じ。直す 時は そちらを 直して 入れ直す）-->
+<style>
+  #lpRoot { position: fixed; left: 0; right: 0; bottom: 0; z-index: 9000; background: #fff; border-top: 3px solid var(--lp-hl, #fbd94f);
+    box-shadow: 0 -12px 40px rgba(29,58,92,.18); transform: translateY(105%); transition: transform .2s ease; max-height: 88vh; overflow-y: auto;
+    font-family: 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', sans-serif; color: var(--lp-ink, #1d3a5c); font-size: 14px; line-height: 1.5; }
+  #lpRoot.open { transform: none; }
+  #lpRoot * { box-sizing: border-box; }
+  #lpRoot .lp-in { max-width: 980px; margin: 0 auto; padding: 12px 16px 14px; }
+  #lpRoot .lp-mono { font-family: 'DM Mono', ui-monospace, monospace; }
+  #lpRoot .lp-top { display: flex; align-items: center; gap: 10px; }
+  #lpRoot .lp-who { flex: 1; min-width: 0; }
+  #lpRoot .lp-who b { font: 700 14px 'DM Mono', ui-monospace, monospace; color: var(--lp-accent, #3f6690); margin-right: 8px; }
+  #lpRoot .lp-who span { font-weight: 500; overflow-wrap: anywhere; }
+  #lpRoot .lp-prog { font-size: 12px; color: #8197b0; white-space: nowrap; }
+  #lpRoot .lp-acts { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+  #lpRoot .lp-acts:empty { display: none; }
+  #lpRoot button { font: inherit; cursor: pointer; }
+  #lpRoot .lp-btn { border: 1px solid #dfe7f0; background: #fff; border-radius: 9px; padding: 6px 12px; color: #4a6f96; font-size: 13px; white-space: nowrap; }
+  #lpRoot .lp-btn:hover { border-color: var(--lp-accent, #3f6690); color: var(--lp-accent, #3f6690); }
+  #lpRoot .lp-btn.yel { background: var(--lp-hl, #fbd94f); border-color: var(--lp-hl-line, #e9c53a); color: #5c4600; font-weight: 700; font-size: 14px; padding: 8px 16px; }
+  #lpRoot .lp-btn.pri { background: var(--lp-accent, #3f6690); border-color: var(--lp-accent, #3f6690); color: #fff; font-weight: 700; }
+  #lpRoot .lp-btn.dis { color: #b8604a; border-color: #ecc3b6; }
+  #lpRoot .lp-btn:disabled { opacity: .45; cursor: default; }
+  #lpRoot .lp-row { display: flex; gap: 8px; margin-top: 10px; align-items: stretch; }
+  #lpRoot .lp-row textarea { flex: 1; min-width: 0; font: 500 20px/1.35 'DM Mono', ui-monospace, monospace; letter-spacing: 1px; border: 2px solid var(--lp-hl-line, #e9c53a); border-radius: 10px;
+    padding: 8px 12px; color: var(--lp-ink, #1d3a5c); background: #fff; outline: none; resize: none; overflow: hidden; }
+  #lpRoot .lp-row textarea:focus { box-shadow: 0 0 0 3px rgba(251,217,79,.35); }
+  #lpRoot .lp-quick { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; align-items: center; }
+  #lpRoot .lp-quick .lp-ql { font-size: 11px; color: #8197b0; margin-right: 2px; }
+  #lpRoot .lp-quick button { border: 1px solid #dfe7f0; background: #f6f9fc; border-radius: 999px; padding: 4px 12px; font: 500 13px 'DM Mono', ui-monospace, monospace; color: var(--lp-ink, #1d3a5c); }
+  #lpRoot .lp-quick button i { font: normal 400 11px 'Noto Sans JP', sans-serif; color: #8197b0; margin-right: 4px; }
+  #lpRoot .lp-quick button.pend { border-color: var(--lp-hl-line, #e9c53a); background: var(--lp-hl-soft, #fff8dc); }
+  #lpRoot .lp-parts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; align-items: center; }
+  #lpRoot .lp-parts:empty { display: none; }
+  #lpRoot .lp-parts button { border: 1px solid #dfe7f0; background: #fff; border-radius: 8px; padding: 3px 10px; font: 500 13.5px 'DM Mono', ui-monospace, monospace; color: var(--lp-ink, #1d3a5c); }
+  #lpRoot .lp-parts button.on { border: 2px solid var(--lp-hl, #fbd94f); background: var(--lp-hl-soft, #fff8dc); }
+  #lpRoot .lp-parts button.raw { color: #8197b0; }
+  #lpRoot .lp-parts .lp-comma { color: #8197b0; font: 500 14px 'DM Mono', ui-monospace, monospace; }
+  #lpRoot .lp-build { margin-top: 8px; display: grid; gap: 6px; }
+  #lpRoot .lp-lbl { font-size: 11px; color: #8197b0; }
+  #lpRoot .lp-keys { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+  #lpRoot .lp-keys button { min-width: 40px; height: 38px; border: 1px solid #dfe7f0; background: #fff; border-radius: 8px; font: 500 15px 'DM Mono', ui-monospace, monospace; color: var(--lp-ink, #1d3a5c); padding: 0 6px; }
+  #lpRoot .lp-keys button.sm { min-width: 34px; height: 34px; font-size: 13.5px; }
+  #lpRoot .lp-keys button.circ { font-size: 18px; }
+  #lpRoot .lp-keys button.on { background: var(--lp-accent, #3f6690); border-color: var(--lp-accent, #3f6690); color: #fff; }
+  #lpRoot .lp-keys button.has { background: var(--lp-accent-soft, #eaf1f8); border-color: var(--lp-accent, #3f6690); color: var(--lp-accent, #3f6690); }
+  #lpRoot .lp-keys button.act { min-width: auto; padding: 0 12px; font: 500 13px 'Noto Sans JP', sans-serif; color: #4a6f96; background: #f6f9fc; }
+  #lpRoot .lp-keys button.act.on { background: var(--lp-accent-soft, #eaf1f8); color: var(--lp-accent, #3f6690); border-color: var(--lp-accent, #3f6690); }
+  #lpRoot .lp-keys button:disabled { opacity: .35; cursor: default; }
+  #lpRoot .lp-keys .lp-sep { width: 10px; }
+  #lpRoot .lp-keys .lp-br { flex-basis: 100%; height: 0; }
+  #lpRoot .lp-dim { font-size: 12px; color: #8197b0; }
+  #lpRoot .lp-foot { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 12px; color: #8197b0; flex-wrap: wrap; }
+  #lpRoot .lp-grow { flex: 1; }
+  @media (max-width: 719px) { #lpRoot .lp-keys button { min-width: 38px; height: 40px; } #lpRoot .lp-in { padding: 10px 12px 12px; } }
+  /* 右から出る形（LocPad.setSide(true)）— 確認の窓（z 1000）より下 */
+  #lpRoot.side { top: 0; left: auto; z-index: 900; width: var(--lp-side-w, min(560px, 100vw)); max-height: none; border-top: none; border-left: 3px solid var(--lp-hl, #fbd94f);
+    box-shadow: -6px 0 24px rgba(29,58,92,.14); transform: translateX(105%); visibility: hidden; transition: transform .2s ease-out, visibility 0s linear .2s; }
+  #lpRoot.side.open { transform: none; visibility: visible; transition: transform .2s ease-out, visibility 0s; }
+  #lpRoot.side .lp-in { max-width: none; padding: 0 18px 20px; }
+  #lpRoot.side .lp-head { position: sticky; top: 0; z-index: 2; background: #fff; padding: 16px 0 10px; border-bottom: 1px solid #edf1f5; }
+  #lpRoot.side .lp-top { align-items: flex-start; }
+  #lpRoot.side .lp-who b { display: block; font-size: 20px; margin: 0 0 2px; }
+  #lpRoot.side .lp-who span { font-size: 15px; }
+  #lpRoot.side .lp-keys button { min-width: 44px; height: 42px; }
+  #lpRoot.side .lp-keys button.sm { min-width: 38px; height: 38px; }
+  /* 商品の数など（info）— 名前の下に 1行 */
+  #lpRoot .lp-info { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; margin-top: 6px; font-size: 13px; color: #6f86a0; }
+  #lpRoot .lp-i em { font-style: normal; margin-right: 5px; }
+  #lpRoot .lp-i strong { font: 700 15px 'DM Mono', ui-monospace, monospace; color: var(--lp-ink, #1d3a5c); }
+  #lpRoot .lp-i.big strong { font-size: 19px; color: var(--lp-accent, #3f6690); }
+</style>
+<script>
+(function() {
+  var ROOMS = ["5", "6", "7", "81", "82", "83", "84", "85", "86", "87"];
+  var LANES_8 = "ABCDEFGHIJKLMN".split("");             // 81〜87 の列・（ ）の中の文字
+  var LANES_7 = "ABCDEFGHIJKLMNOPQRSTUVWX".split("");   // 7 の列は A〜X
+  var SECS_7 = [1, 2, 3, 4, 5];                         // 7 の ①〜⑤
+  var POS_NUM = ["1", "2", "3", "4"];
+  var CIRC = "①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳";
+  var esc = function(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function(c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); };
+  var circ = function(n) { return CIRC.charAt(n - 1) || String(n); };
+  var circNum = function(ch) { return CIRC.indexOf(ch) + 1; };
+  var show = function(v) { return String(v).replace(/\n/g, " ↵ "); };   // 2行の場所を 1行で見せる
+
+  // ── 場所の形 ──
+  //  場所 = 行 ↵ 行 …   行 = 部分 , 部分 …
+  //  部分 = 81〜87（と 5・6）＋ 列（A〜Z ＋（数字 か 文字 を , で））…   例 84A(2,3)F(E)
+  //       = 7 ＋ 列（A〜Z ＋ ①〜⑳ ＋ 番号（1,2 / 1-4））…            例 7F④1⑤1,2
+  //  打った文字は O〜Z も読む（ボタンは 8x が A〜N・7 が A〜X）。形に合わない部分は そのまま（raw）
+  var RE8 = /^(8[1-7]|[56])((?:[A-Z](?:\([0-9A-Z,]*\))?)*)$/;
+  var RE7 = /^7((?:[A-Z](?:[①-⑳][0-9,\-]*)*)*)$/;
+  // 続きの行 — 改行の後の「M(1)」のような 部屋の無い 列だけの部分 = 上の 部屋（81〜87・7）の続き。p.cont = その部屋（文字には 書かない）
+  var RE8L = /^(?:[A-Z](?:\([0-9A-Z,]*\))?)+$/;
+  var RE7L = /^(?:[A-Z](?:[①-⑳][0-9,\-]*)+)+$/;
+  function roomOf(p) { return p ? (p.room || p.cont || "") : ""; }
+  function contRoom(p) { var r = roomOf(p); return p && p.raw == null && (r === "7" || r.length === 2) ? r : ""; }   // 次の行が 続けられる部屋
+  // 1行を 部分に — （ ）の中の , は切らない。7 の「③1,2」の ,2 も 前の部分の続き（5・6・7・81〜87 だけなら 新しい部屋）
+  function splitLine(v) {
+    var raw = [], depth = 0, cur = "";
+    for (var i = 0; i < v.length; i++) {
+      var ch = v[i];
+      if (ch === "(") depth++; else if (ch === ")") depth = Math.max(0, depth - 1);
+      if (ch === "," && depth === 0) { raw.push(cur); cur = ""; } else cur += ch;
+    }
+    raw.push(cur);
+    var out = [];
+    raw.forEach(function(t) {
+      var prev = out[out.length - 1];
+      if (prev != null && /[①-⑳][0-9,\-]*$/.test(prev) && /^\d+(-\d+)?$/.test(t) && !/^(5|6|7|8[1-7])$/.test(t)) out[out.length - 1] = prev + "," + t;
+      else out.push(t);
+    });
+    return out;
+  }
+  function posParse7(s) {
+    var out = [];
+    String(s || "").split(",").forEach(function(t) {
+      var m = /^(\d+)-(\d+)$/.exec(t);
+      if (m) { var a = +m[1], b = +m[2], lo = Math.min(a, b), hi = Math.max(a, b); for (var k = lo; k <= hi && k - lo < 50; k++) out.push(String(k)); }
+      else if (t !== "") out.push(t);
+    });
+    return out.filter(function(x, i) { return out.indexOf(x) === i; });
+  }
+  // ctx = 上の 部屋（続きの行を 読む時）
+  function parsePart(s, ctx) {
+    if (ctx && (ctx === "7" ? RE7L : RE8L).test(s)) { var pc = parsePart(ctx + s); if (pc.raw == null) { pc.room = ""; pc.cont = ctx; return pc; } }
+    var m7 = RE7.exec(s);
+    if (m7) {
+      var lanes7 = [], re7 = /([A-Z])((?:[①-⑳][0-9,\-]*)*)/g, k7;
+      while ((k7 = re7.exec(m7[1]))) {
+        var secs = [], rs = /([①-⑳])([0-9,\-]*)/g, q;
+        while ((q = rs.exec(k7[2]))) secs.push({ c: circNum(q[1]), pos: posParse7(q[2]) });
+        lanes7.push({ L: k7[1], secs: secs });
+      }
+      return { room: "7", lanes: lanes7 };
+    }
+    var m = RE8.exec(s);
+    if (!m || (m[1].length === 1 && m[2])) return { raw: s };   // 5・6 は 部屋だけ（5A(1) などは 打ったまま）
+    var lanes = [], re = /([A-Z])(?:\(([0-9A-Z,]*)\))?/g, k;
+    while ((k = re.exec(m[2]))) lanes.push({ L: k[1], pos: k[2] ? k[2].split(",").filter(Boolean) : [] });
+    return { room: m[1], lanes: lanes };
+  }
+  // そろえる: 全角→半角・小文字→大文字・「、，」→「,」（①〜⑳ は NFKC で「1」にならないように 守る）。
+  // ボタンで作れる形の行は 空白も消す。行（Alt+Enter）は 残す。空の行は 消す
+  function nfkcKeep(s) {
+    return String(s).replace(/[①-⑳]/g, function(c) { return String.fromCharCode(0xE000 + c.charCodeAt(0) - 0x2460); })
+      .normalize("NFKC").replace(/[-]/g, function(c) { return String.fromCharCode(0x2460 + c.charCodeAt(0) - 0xE000); });
+  }
+  function normLine(line) {
+    var s = line.trim().replace(/[、，]/g, ",");
+    var tight = s.replace(/\s+/g, "");
+    if (tight && splitLine(tight).filter(Boolean).every(function(p) { return parsePart(p).raw == null; })) return tight;
+    return s.replace(/\s*,\s*/g, ",");
+  }
+  function norm(v) {
+    return nfkcKeep(v == null ? "" : v).toUpperCase().replace(/\r\n?/g, "\n").split("\n").map(normLine).filter(function(l) { return l !== ""; }).join("\n");
+  }
+  function posSort(a) {
+    return a.slice().sort(function(x, y) { var nx = /^\d+$/.test(x), ny = /^\d+$/.test(y); return nx && ny ? x - y : nx ? -1 : ny ? 1 : 0; });
+  }
+  // 7 の番号 — 4つ以上 続いていれば「1-4」、ほかは「1,2,3」（例 7F①1-4・7F②1,2,3）
+  function posText7(pos) {
+    var a = posSort(pos);
+    var run = a.length >= 4 && a.every(function(x, i) { return /^\d+$/.test(x) && (i === 0 || +x === +a[i - 1] + 1); });
+    return run ? a[0] + "-" + a[a.length - 1] : a.join(",");
+  }
+  function partText(p) {
+    if (p.raw != null) return p.raw;
+    if (p.cont) return partText({ room: p.cont, lanes: p.lanes }).slice(p.cont.length);   // 続きの行 — 部屋は 書かない
+    if (!p.room) return "";
+    if (p.room === "7") return "7" + p.lanes.map(function(l) { return l.L + l.secs.map(function(s) { return circ(s.c) + posText7(s.pos); }).join(""); }).join("");
+    if (p.room.length === 1) return p.room;
+    return p.room + p.lanes.map(function(l) { return l.L + (l.pos.length ? "(" + posSort(l.pos).join(",") + ")" : ""); }).join("");
+  }
+
+  // 入れている部分 — S.parts（sep = 前の部分との間: "," か "\n"（改行）か ",\n"）。S.li = 列、S.si = 7 の ①〜⑤
+  var S = { parts: [{ room: "", lanes: [], sep: "" }], pi: 0, li: -1, si: -1, letters: false, opts: null, side: false };
+  var root = null;
+  function $(id) { return document.getElementById(id); }
+  function announce(isOpen) { try { document.dispatchEvent(new CustomEvent("locpad", { detail: { open: isOpen } })); } catch (e) {} }
+
+  function build() {
+    if (root) return;
+    root = document.createElement("div");
+    root.id = "lpRoot";
+    if (S.side) root.className = "side";
+    root.innerHTML =
+      '<div class="lp-in">' +
+        '<div class="lp-head">' +
+          '<div class="lp-top"><div class="lp-who" id="lpWho"></div><button class="lp-btn" id="lpClose">閉じる</button></div>' +
+          '<div class="lp-acts"><span class="lp-prog" id="lpProg"></span><span class="lp-grow"></span>' +
+            '<button class="lp-btn dis" id="lpDiscard">取り消す</button><button class="lp-btn pri" id="lpSave"></button></div>' +
+        '</div>' +
+        '<div class="lp-row"><textarea id="lpIn" rows="1" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="場所"></textarea><button class="lp-btn yel" id="lpOk"></button></div>' +
+        '<div class="lp-quick" id="lpQuick"></div>' +
+        '<div class="lp-parts" id="lpParts"></div>' +
+        '<div class="lp-build">' +
+          '<div class="lp-lbl">部屋</div><div class="lp-keys" id="lpRoom"></div>' +
+          '<div class="lp-lbl" id="lpLaneLbl">列</div><div class="lp-keys" id="lpLane"></div>' +
+          '<div class="lp-lbl" id="lpSecLbl">①〜⑤</div><div class="lp-keys" id="lpSec"></div>' +
+          '<div class="lp-lbl" id="lpPosLbl">（ ）の中 — いくつでも</div><div class="lp-keys" id="lpPos"></div>' +
+          '<div class="lp-keys" id="lpAct"></div>' +
+        '</div>' +
+        '<div class="lp-foot"><span id="lpHint"></span><span class="lp-grow"></span><button class="lp-btn" id="lpSkip">とばす</button></div>' +
+      '</div>';
+    document.body.appendChild(root);
+    var inp = $("lpIn");
+    inp.addEventListener("input", function() { parseInto(inp.value); keys(); grow(); changed(); });
+    inp.addEventListener("keydown", function(e) {
+      if (e.isComposing || e.keyCode === 229) return;           // 日本語の変換中の Enter は 確定にしない
+      if (e.key === "Enter" && (e.altKey || e.shiftKey)) { e.preventDefault(); newline(); }   // Alt+Enter = 改行（長い場所を 2行に）
+      else if (e.key === "Enter") { e.preventDefault(); ok(); }
+      else if (e.key === "Escape") { e.preventDefault(); close(); }
+    });
+    // ここで押したキーは 画面のほかの所に渡さない（出庫処理の「Enter で出庫」・「Esc で前の段階へ」などが動かないように）
+    root.addEventListener("keydown", function(e) { e.stopPropagation(); });
+    $("lpOk").onclick = ok;
+    $("lpClose").onclick = close;
+    $("lpSkip").onclick = function() { if (S.opts && S.opts.onSkip) S.opts.onSkip(); };
+    $("lpSave").onclick = function() { var f = S.opts && S.opts.foot; if (f && f.onSave) f.onSave(); };
+    $("lpDiscard").onclick = function() { var f = S.opts && S.opts.foot; if (f && f.onDiscard) f.onDiscard(); };
+    root.addEventListener("click", function(e) {
+      var b = e.target.closest("[data-lp]"); if (!b || b.disabled) return;
+      var a = b.getAttribute("data-lp"), v = b.getAttribute("data-v");
+      if (a === "room") setRoom(v); else if (a === "lane") setLane(v); else if (a === "sec") setSec(+v); else if (a === "pos") togglePos(v);
+      else if (a === "part") { S.pi = +v; selectEnd(); keys(); }
+      else if (a === "sib") { inp.value = v; parseInto(v); keys(); grow(); changed(); if (!coarse()) inp.focus(); }
+      else if (a === "letters") { S.letters = !S.letters; keys(); }
+      else if (a === "newpart") { S.parts.push({ room: "", lanes: [], sep: "," }); S.pi = S.parts.length - 1; S.li = -1; S.si = -1; S.letters = false; put(); }
+      else if (a === "newline") newline();
+      else if (a === "back") backspace();
+      else if (a === "clear") { parseInto(""); put(); }
+    });
+  }
+  function coarse() { try { return matchMedia("(pointer: coarse)").matches; } catch (e) { return false; } }
+  function grow() { var i = $("lpIn"); i.rows = Math.max(1, i.value.split("\n").length); }
+
+  // 改行 — 文字の途中なら そこに、終わりなら 次の行に 新しい部分
+  function newline() {
+    var inp = $("lpIn"), at = inp.selectionStart, end = inp.selectionEnd, v = inp.value;
+    // 次の行は 上の 部屋の続き（列から 入れられる）— 別の部屋は 部屋の ボタンで
+    if (at == null || at >= v.length) { var cur = S.parts[S.pi]; if (partText(cur)) { S.parts.push({ room: "", lanes: [], sep: "\n", cont: contRoom(cur) }); S.pi = S.parts.length - 1; S.li = -1; S.si = -1; } put(); return; }
+    inp.value = v.slice(0, at) + "\n" + v.slice(end);
+    inp.selectionStart = inp.selectionEnd = at + 1;
+    parseInto(inp.value); keys(); grow(); changed();
+  }
+  function selectEnd() {
+    var p = S.parts[S.pi];
+    S.li = p.lanes ? p.lanes.length - 1 : -1;
+    var lane = p.lanes && p.lanes[S.li];
+    S.si = lane && lane.secs ? lane.secs.length - 1 : -1;
+  }
+  function parseInto(v) {
+    var parts = [], lines = String(v == null ? "" : v).split("\n"), lineSep = "", ctx = "";
+    // 部分を 読む — 列だけの 部分は 上の 部屋の続き（ctx）。読むたびに ctx を その部分の 部屋に
+    var readSegs = function(segs, c) {
+      return segs.map(function(s) { var p = parsePart(s, c); c = p.raw != null ? "" : contRoom(p); return p; });
+    };
+    lines.forEach(function(line, li) {
+      var t = line.trim(), trail = /,$/.test(t);
+      var ps = readSegs(splitLine(nfkcKeep(t).toUpperCase().replace(/[、，]/g, ",").replace(/\s+/g, "")).filter(Boolean), ctx);
+      if (ps.some(function(p) { return p.raw != null; })) ps = readSegs(splitLine(t).filter(Boolean), ctx);   // 形に合わない所があれば 打ったまま
+      ps.forEach(function(p, k) { p.sep = k ? "," : (parts.length ? lineSep || "\n" : ""); parts.push(p); ctx = p.raw != null ? "" : contRoom(p); });
+      if (li < lines.length - 1) lineSep = trail ? ",\n" : "\n";
+      else if (trail && parts.length) parts.push({ room: "", lanes: [], sep: "," });   // 最後が「,」— 次の部屋を入れる所
+    });
+    if (lines.length > 1 && lines[lines.length - 1].trim() === "" && parts.length) parts.push({ room: "", lanes: [], sep: lineSep || "\n", cont: /\n/.test(lineSep || "\n") ? ctx : "" });   // 改行したばかり — 上の 部屋の続き
+    S.parts = parts.length ? parts : [{ room: "", lanes: [], sep: "" }];
+    S.pi = S.parts.length - 1;
+    selectEnd();
+  }
+  // 部分を つなぐ。入れている途中の 空の部分は その前の「,」「↵」だけ 見せる
+  function compose() {
+    var out = "";
+    S.parts.forEach(function(p, i) {
+      var t = partText(p);
+      if (!t && i !== S.pi) return;
+      out += (out ? (p.sep || ",") : "") + t;
+    });
+    return out;
+  }
+  function put() { $("lpIn").value = compose(); keys(); grow(); changed(); }
+  function changed() { if (S.opts && S.opts.onInput) S.opts.onInput(dirty()); else setFoot(S.opts && S.opts.foot); }
+
+  function keys() {
+    var p = S.parts[S.pi], edit = p && p.raw == null, er = edit ? roomOf(p) : "", seven = edit && er === "7", big = edit && (er.length === 2 || seven);   // er = 続きの行は 上の 部屋
+    var lane = big ? p.lanes[S.li] : null, sec = seven && lane ? lane.secs[S.si] : null;
+    $("lpParts").innerHTML = (S.parts.length > 1 || (p && p.raw != null)) ? S.parts.map(function(x, i) {
+      return (i ? '<span class="lp-comma">' + (/\n/.test(x.sep) ? "↵" : ",") + '</span>' : "") + '<button data-lp="part" data-v="' + i + '" class="' + (i === S.pi ? "on " : "") + (x.raw != null ? "raw" : "") + '">' + esc(partText(x) || "…") + '</button>';
+    }).join("") : "";
+    $("lpRoom").innerHTML = ROOMS.map(function(r) {
+      return '<button data-lp="room" data-v="' + r + '" class="' + (edit && p.room === r ? "on" : "") + '"' + (edit ? "" : " disabled") + '>' + r + '</button>';
+    }).join("");
+    var lanes = seven ? LANES_7 : LANES_8;
+    $("lpLane").innerHTML = big ? lanes.map(function(L) {
+      var i = p.lanes.findIndex(function(l) { return l.L === L; });
+      return '<button data-lp="lane" data-v="' + L + '" class="sm ' + (i === S.li ? "on" : i >= 0 ? "has" : "") + '">' + L + '</button>';
+    }).join("") : '<span class="lp-dim">' + (edit && p.room ? "（5・6 は 部屋だけ）" : "部屋を選ぶと 出ます") + '</span>';
+    $("lpLaneLbl").textContent = (seven ? "列（A〜X）" : "列") + (edit && p.cont ? "（" + p.cont + " の続き — 別の部屋は 上の 部屋を）" : "");
+    // 7: ①〜⑤
+    $("lpSecLbl").style.display = $("lpSec").style.display = seven ? "" : "none";
+    $("lpSec").innerHTML = seven ? SECS_7.map(function(c) {
+      var i = lane ? lane.secs.findIndex(function(s) { return s.c === c; }) : -1;
+      return '<button data-lp="sec" data-v="' + c + '" class="circ ' + (i >= 0 && i === S.si ? "on" : i >= 0 ? "has" : "") + '"' + (lane ? "" : " disabled") + '>' + circ(c) + '</button>';
+    }).join("") : "";
+    // 番号 — 7 は ①〜⑤ の中の 1〜4、81〜87 は （ ）の中（1〜4・文字）
+    var posOn = seven ? sec : lane, posList = seven ? (sec ? sec.pos : []) : (lane ? lane.pos : []);
+    var posKey = function(v, sm) { return '<button data-lp="pos" data-v="' + v + '" class="' + (sm ? "sm " : "") + (posList.indexOf(v) >= 0 ? "on" : "") + '"' + (posOn ? "" : " disabled") + '>' + v + '</button>'; };
+    $("lpPosLbl").textContent = seven ? "番号 — いくつでも（4つ続くと 1-4）" : "（ ）の中 — いくつでも";
+    $("lpPos").innerHTML = POS_NUM.map(function(v) { return posKey(v); }).join("") + (seven ? "" :
+      '<span class="lp-sep"></span><button data-lp="letters" class="act ' + (S.letters ? "on" : "") + '"' + (lane ? "" : " disabled") + '>文字 A〜N</button>' +
+      (S.letters && lane ? '<span class="lp-br"></span>' + LANES_8.map(function(v) { return posKey(v, true); }).join("") : ""));
+    $("lpAct").innerHTML = '<button data-lp="newpart" class="act"' + (p && partText(p) ? "" : " disabled") + '>，別の部屋も</button>' +
+      '<button data-lp="newline" class="act" title="Alt+Enter"' + (p && partText(p) ? "" : " disabled") + '>↵ 改行</button>' +
+      '<button data-lp="back" class="act">⌫ 1つ消す</button><button data-lp="clear" class="act">クリア</button>';
+    $("lpLaneLbl").style.opacity = big ? 1 : .4;
+    $("lpSecLbl").style.opacity = lane ? 1 : .4;
+    $("lpPosLbl").style.opacity = posOn ? 1 : .4;
+  }
+  // 部屋 — 形が変わる時（7 ⇔ 81〜87 ⇔ 5・6）は 列を 消す
+  function setRoom(r) {
+    var p = S.parts[S.pi], kind = function(x) { return x === "7" ? 7 : x.length === 2 ? 8 : x ? 1 : 0; };
+    if (r.length === 1 && r !== "7") p.lanes = [];
+    else if (kind(roomOf(p)) !== kind(r)) p.lanes = [];
+    p.room = r; delete p.cont;   // 続きの行に 部屋を押した — その部屋の 行に
+    selectEnd(); put();
+  }
+  // 列: まだ無い列 → 足す（今の列に中身が無ければ 置きかえ）。ある列 → その列を選ぶ
+  function setLane(L) {
+    var p = S.parts[S.pi], seven = roomOf(p) === "7", i = p.lanes.findIndex(function(l) { return l.L === L; }), cur = p.lanes[S.li];
+    var empty = function(l) { return seven ? !l.secs.length : !l.pos.length; };
+    if (i >= 0) { S.li = i; var l = p.lanes[i]; S.si = seven ? l.secs.length - 1 : -1; }
+    else if (cur && empty(cur)) cur.L = L;
+    else { p.lanes.push(seven ? { L: L, secs: [] } : { L: L, pos: [] }); S.li = p.lanes.length - 1; S.si = -1; }
+    put();
+  }
+  // 7 の ①〜⑤ — 列と同じ（無い → 足す・中身の無い今の所は 置きかえ・ある → 選ぶ）
+  function setSec(c) {
+    var lane = S.parts[S.pi].lanes[S.li]; if (!lane) return;
+    var i = lane.secs.findIndex(function(s) { return s.c === c; }), cur = lane.secs[S.si];
+    if (i >= 0) S.si = i;
+    else if (cur && !cur.pos.length) cur.c = c;
+    else { lane.secs.push({ c: c, pos: [] }); S.si = lane.secs.length - 1; }
+    put();
+  }
+  function togglePos(v) {
+    var p = S.parts[S.pi], lane = p.lanes[S.li], box = roomOf(p) === "7" ? lane && lane.secs[S.si] : lane;
+    if (!box) return;
+    var i = box.pos.indexOf(v); if (i >= 0) box.pos.splice(i, 1); else box.pos.push(v);
+    put();
+  }
+  // ⌫ — 最後に入れた物を1つ（番号 → ①〜⑤ → 列 → 部屋 → その部分）。空になった部分は残さない
+  function backspace() {
+    var p = S.parts[S.pi];
+    if (p.raw != null) S.parts.splice(S.pi, 1);
+    else {
+      var lane = p.lanes[S.li], sec = roomOf(p) === "7" && lane ? lane.secs[S.si] : null;
+      if (sec && sec.pos.length) sec.pos.pop();
+      else if (sec) { lane.secs.splice(S.si, 1); S.si = lane.secs.length - 1; }
+      else if (lane && lane.pos && lane.pos.length) lane.pos.pop();
+      else if (lane) { p.lanes.splice(S.li, 1); selectEnd(); }
+      else if (p.room) { p.room = ""; if (S.parts.length > 1) S.parts.splice(S.pi, 1); }
+      else if (S.parts.length > 1) S.parts.splice(S.pi, 1);
+    }
+    if (!S.parts.length) S.parts = [{ room: "", lanes: [], sep: "" }];
+    if (S.pi >= S.parts.length) { S.pi = S.parts.length - 1; selectEnd(); }
+    put();
+  }
+
+  // info: [{ k: "入庫数", v: 12, big: true }, …] — 名前の下に出す（空の値は出さない）
+  function infoHtml(list) {
+    var xs = (list || []).filter(function(x) { return x && x.v !== "" && x.v != null; });
+    return xs.length ? '<div class="lp-info">' + xs.map(function(x) {
+      return '<div class="lp-i' + (x.big ? " big" : "") + '"><em>' + esc(x.k) + "</em><strong>" + esc(x.v) + "</strong></div>";
+    }).join("") + "</div>" : "";
+  }
+
+  function render() {
+    var o = S.opts;
+    $("lpWho").innerHTML = (o.title ? "<b>" + esc(o.title) + "</b>" : "") + "<span>" + esc(o.sub || "") + "</span>" + infoHtml(o.info);
+    $("lpProg").textContent = o.progress || "";
+    $("lpOk").textContent = o.okText || "決定";
+    var sib = (o.siblings || []).filter(function(s) { return s && s.v; });
+    $("lpQuick").innerHTML = sib.length ? '<span class="lp-ql">' + esc(o.siblingsLabel || "同じ伝票") + '</span>' + sib.map(function(s) {
+      return '<button data-lp="sib" data-v="' + esc(s.v) + '" class="' + (s.pend ? "pend" : "") + '">' + (s.n ? "<i>" + esc(s.n) + "</i>" : "") + esc(show(s.v)) + '</button>';
+    }).join("") : "";
+    $("lpHint").textContent = o.hint != null ? o.hint : (o.onSkip ? "Enter = 入れて次へ ・ Alt+Enter = 改行" : "Enter = " + (o.okText || "決定") + " ・ Alt+Enter = 改行");
+    $("lpSkip").style.display = o.onSkip ? "" : "none";
+    setFoot(o.foot);
+  }
+  // 「保存する」「取り消す」— いつも上に。入れている途中（Enter 前）でも 保存できる（onStage で先に入れる）
+  function setFoot(f) {
+    if (!root || !S.opts) return;
+    S.opts.foot = f || null;
+    var b = $("lpSave"), d = $("lpDiscard"), n = f ? (f.count || 0) : 0;
+    if (!f || !f.onSave) { b.style.display = "none"; d.style.display = "none"; return; }
+    b.style.display = "";
+    b.disabled = !(n || dirty()) || !!f.busy;
+    b.textContent = f.busy ? "保存中…" : "保存する" + (n ? "（" + n + "）" : "");
+    d.style.display = f.onDiscard && n ? "" : "none";
+  }
+  function dirty() { return !!(S.opts && S.opts.onStage) && norm($("lpIn").value) !== norm(S.opts.value || ""); }
+  function stageNow() {
+    if (!dirty()) return false;
+    var v = norm($("lpIn").value);
+    if (!checkText(v)) return false;
+    S.opts.onStage(v);
+    if (S.opts) S.opts.value = v;
+    return true;
+  }
+  function checkText(v) {
+    if (v.length > 120 || /[;{}]|function\s*\(|=>|getElementById/.test(v)) { alert("場所として長すぎるか、コードのような文字です。確かめてください。"); return false; }
+    return true;
+  }
+  function ok() {
+    if (!S.opts) return;
+    var v = norm($("lpIn").value);
+    if (!checkText(v)) return;
+    if (S.opts.onOk) S.opts.onOk(v);
+  }
+  function open(opts) {
+    build();
+    S.opts = opts || {};
+    S.letters = false;
+    var v = norm(S.opts.value || "");
+    $("lpIn").value = v;
+    parseInto(v);
+    if (S.parts.some(function(p) { return p.raw == null && p.room !== "7" && p.lanes && p.lanes.some(function(l) { return l.pos.some(function(x) { return /[A-Z]/.test(x); }); }); })) S.letters = true;
+    render(); keys(); grow();
+    var was = root.classList.contains("open");
+    root.classList.add("open");
+    if (!was) announce(true);
+    if (!coarse()) setTimeout(function() { var i = $("lpIn"); i.focus(); i.select(); }, 50);   // スマホは ボタンで入れるので キーボードを出さない
+  }
+  function close() {
+    if (!root || !root.classList.contains("open")) return;
+    root.classList.remove("open");
+    var o = S.opts; S.opts = null;
+    if (o && o.onClose) o.onClose();
+    announce(false);
+  }
+  function setSide(on) { S.side = !!on; if (root) root.classList.toggle("side", S.side); }
+  window.LocPad = { open: open, close: close, isOpen: function() { return !!(root && root.classList.contains("open")); }, norm: norm, setFoot: setFoot, setSide: setSide,
+                    dirty: function() { return !!root && dirty(); }, stageNow: stageNow,
+                    _parse: function(v) { parseInto(v); return compose(); } };
+})();
+</script>
+<!-- LOCPAD END -->
+<script src="mock4.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  // ── 覚えておく もの（この アプリの 中だけ）──
+  var K = { d: "nishiki_scan_d", t: "nishiki_scan_token", u: "nishiki_scan_user", c: "nishiki_scan_client",
+            clients: "nishiki_scan_clients", list: "nishiki_scan_list_", lastUser: "nishiki_scan_lastuser" };
+  function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  function lsDel(k) { try { localStorage.removeItem(k); } catch (e) {} }
+  function lsJson(k) { try { return JSON.parse(lsGet(k) || "null"); } catch (e) { return null; } }
+
+  var D_RE = /^AKfyc[A-Za-z0-9_-]{20,120}$/;
+  var qs = new URLSearchParams(location.search);
+  var dep = qs.get("d");
+  if (dep && D_RE.test(dep)) lsSet(K.d, dep); else dep = lsGet(K.d);
+  if (!dep || !D_RE.test(dep)) dep = null;
+  var API = dep ? "https://script.google.com/macros/s/" + dep + "/exec" : "";
+
+  var token = lsGet(K.t) || "", user = lsGet(K.u) || "";
+  var clients = lsJson(K.clients) || [];
+  var cur = (lsJson(K.c) || {}).number || "";   // いまの 得意先 = 最後に スキャンした ラベルの 得意先
+  var lists = {};                                 // 得意先 → { at, items: {品番: item}, loading }
+  var recent = [];
+  var seq = 0;
+  var kbMode = false;
+
+  function $(id) { return document.getElementById(id); }
+  function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
+  function hhmm(t) { var d = new Date(t); return ("0" + d.getHours()).slice(-2) + ":" + ("0" + d.getMinutes()).slice(-2); }
+  function show(view) { ["vSetup", "vLogin", "vMain"].forEach(function (v) { $(v).classList.toggle("hidden", v !== view); }); }
+  function clientByNumber(n) { n = String(n); for (var i = 0; i < clients.length; i++) if (String(clients[i].number) === n) return clients[i]; return null; }
+  function clientLabel(n) { var c = clientByNumber(n); return c ? c.number + ". " + c.name : "得意先 " + n; }
+
+  // ── サーバー（Google Apps Script）──
+  // Google の 一時的な 失敗（HTML の エラー画面・つながらない）は 少し 待って 2回まで やり直す。
+  var WAIT = [800, 2000];
+  function apiGet(params, tries) {
+    tries = tries || 0;
+    var p = {}; for (var k in params) p[k] = params[k];
+    p.t = token;
+    var url = API + "?" + new URLSearchParams(p).toString();
+    return fetch(url, { cache: "no-store", credentials: "omit" })
+      .then(function (r) { return r.text(); })
+      .then(function (txt) {
+        var j; try { j = JSON.parse(txt); } catch (e) { throw new Error("Google の サーバーが 一時的に 失敗しました"); }
+        if (j && j.auth === false) { logout("この 端末の 登録が 切れました — もう一度 ログイン してください"); var a = new Error("auth"); a.auth = true; throw a; }
+        if (!j || !j.ok) { var x = new Error((j && j.error) || "読めませんでした"); x.final = true; throw x; }
+        return j;
+      })
+      .catch(function (e) {
+        if (e.auth || e.final || tries >= WAIT.length) throw e;
+        return new Promise(function (res) { setTimeout(res, WAIT[tries]); }).then(function () { return apiGet(params, tries + 1); });
+      });
+  }
+
+  // 書く 時は POST（本文に トークン）。失敗は 書いた か わからない ので やり直さない（呼ぶ 側が 貯めて 送り直す）
+  function apiPost(body) {
+    var b = {}; for (var k in body) b[k] = body[k];
+    b.t = token;
+    return fetch(API, { method: "POST", body: JSON.stringify(b), credentials: "omit", cache: "no-store" })
+      .then(function (r) { return r.text(); })
+      .then(function (txt) {
+        var j; try { j = JSON.parse(txt); } catch (e) { throw new Error("Google の サーバーが 一時的に 失敗しました"); }
+        if (j && j.auth === false) { logout("この 端末の 登録が 切れました — もう一度 ログイン してください"); var a = new Error("auth"); a.auth = true; throw a; }
+        if (!j || !j.ok) { var x = new Error((j && j.error) || "送れませんでした"); x.final = true; throw x; }
+        return j;
+      });
+  }
+
+  // ── 音（成功: 高い 音 1回・だめ: 低い 音 2回）──
+  var actx = null;
+  function unlockAudio() {
+    if (actx) return;
+    try { var C = window.AudioContext || window.webkitAudioContext; if (C) actx = new C(); } catch (e) { actx = null; }
+  }
+  function tone(freq, start, len) {
+    if (!actx) return;
+    var o = actx.createOscillator(), g = actx.createGain();
+    o.frequency.value = freq; o.type = "square"; g.gain.value = 0.06;
+    o.connect(g); g.connect(actx.destination);
+    o.start(actx.currentTime + start); o.stop(actx.currentTime + start + len);
+  }
+  function beep(ok) {
+    if (!actx) return;
+    try { if (actx.state === "suspended") actx.resume(); if (ok) tone(1320, 0, 0.08); else { tone(220, 0, 0.15); tone(220, 0.22, 0.15); } } catch (e) {}
+  }
+
+  // ── ログイン ──
+  function logout(msg) {
+    token = ""; user = "";
+    lsDel(K.t); lsDel(K.u);
+    showLogin(msg || "");
+  }
+  function showLogin(msg) {
+    show("vLogin");
+    $("lgUser").value = lsGet(K.lastUser) || "";
+    $("lgPass").value = "";
+    $("lgErr").textContent = msg || "";
+  }
+  $("loginForm").addEventListener("submit", function (e) {
+    e.preventDefault(); unlockAudio();
+    var u = $("lgUser").value.trim(), pw = $("lgPass").value;
+    if (!u || !pw) { $("lgErr").textContent = "名前と パスワードを 入れてください"; return; }
+    $("lgErr").textContent = ""; $("lgBtn").disabled = true; $("lgBtn").textContent = "確認中…";
+    fetch(API, { method: "POST", body: JSON.stringify({ api: "login", user: u, pass: pw }), credentials: "omit", cache: "no-store" })
+      .then(function (r) { return r.text(); })
+      .then(function (txt) {
+        var j; try { j = JSON.parse(txt); } catch (err) { throw new Error("Google の サーバーが 一時的に 失敗しました — もう一度"); }
+        if (!j.ok || !j.token) throw new Error(j.error || "ログイン できませんでした");
+        token = j.token; user = j.user || u;
+        lsSet(K.t, token); lsSet(K.u, user); lsSet(K.lastUser, u);
+        $("lgPass").value = "";
+        startMain();
+      })
+      .catch(function (err) { $("lgErr").textContent = err.message || String(err); })
+      .then(function () { $("lgBtn").disabled = false; $("lgBtn").textContent = "ログイン して 登録"; });
+  });
+  ["lgUser", "lgPass"].forEach(function (id) { $(id).addEventListener("input", function () { $("lgErr").textContent = ""; }); });
+
+  // 得意先の 名前（表示 用）— うしろで 読んで 覚えておく
+  function loadClients() {
+    apiGet({ api: "clients" }).then(function (j) {
+      clients = j.clients || []; lsSet(K.clients, JSON.stringify(clients));
+      if (j.user) { user = j.user; lsSet(K.u, user); $("mnUser").textContent = "この 端末: 登録済み・" + user; }
+      renderHeader(); renderRecent();
+    }).catch(function () {});
+  }
+
+  // ── スキャン画面 ──
+  function startMain() {
+    show("vMain");
+    $("mnUser").textContent = "この 端末: 登録済み・" + user;
+    if (cur) useClient(cur, false);
+    renderHeader(); renderRecent();
+    $("card").className = "box card";
+    $("card").innerHTML = '<div class="hint">ラベルを スキャン してください<br><span class="sub">得意先は ラベルで 決まります・📷 カメラ・⌨ 打つ（例 27-10001）</span></div>';
+    loadClients();
+    setMode("home");
+  }
+  function renderHeader() {
+    $("mnClient").textContent = cur ? clientLabel(cur) : "— まだ ありません";
+    var L = cur && lists[cur], n = L ? Object.keys(L.items).length : 0;
+    $("mnList").textContent = !L ? "" : L.loading ? (n ? n + "品・更新中…" : "先読み中…") : (L.at ? n + "品 " + hhmm(L.at) : "");
+    $("mnReload").classList.toggle("hidden", !cur);
+    if (typeof mode !== "undefined" && mode === "shukko" && pk.open) renderPick();
+  }
+  // この 得意先の 商品を 使えるように（覚えている 先読み → すぐ・古ければ / 無ければ 読み直す）
+  function useClient(c, force) {
+    c = String(c);
+    if (!lists[c]) {
+      var cached = lsJson(K.list + c);
+      lists[c] = { at: 0, items: {}, loading: false };
+      if (cached && cached.items && Date.now() - cached.at < 24 * 3600 * 1000) setItems(c, cached.items, cached.at);
+    }
+    var L = lists[c];
+    if (force || (!L.loading && (!L.at || Date.now() - L.at > 15 * 60 * 1000))) preload(c);
+  }
+  function setItems(c, arr, at) {
+    var m = {}; (arr || []).forEach(function (it) { m[String(it.number)] = it; });
+    lists[c].items = m; lists[c].at = at || Date.now();
+  }
+  function preload(c) {
+    var L = lists[c];
+    if (L.loading) return;
+    L.loading = true; renderHeader();
+    apiGet({ api: "list", client: c }).then(function (j) {
+      setItems(c, j.items, j.at);
+      lsSet(K.list + c, JSON.stringify({ at: j.at || Date.now(), items: j.items || [] }));
+    }).catch(function (e) {
+      if (!e.auth && c === cur) $("scanErr").textContent = "先読み できませんでした（1品ずつ 読みます）: " + e.message;
+    }).then(function () { L.loading = false; renderHeader(); });
+  }
+  $("mnReload").addEventListener("click", function () { $("scanErr").textContent = ""; if (cur) useClient(cur, true); focusScan(); });
+  $("logoutBtn").addEventListener("click", function () {
+    if (!confirm("この 端末の ログインを やめますか？（次は また ログイン）")) return;
+    logout("");
+  });
+
+  // 入力を いつも スキャン待ちに（iPhone は タップの 中でしか focus できない）
+  var scanIn = $("scanIn");
+  function focusScan() { try { scanIn.focus({ preventScroll: true }); } catch (e) { scanIn.focus(); } }
+  function pill() {
+    var on = document.activeElement === scanIn;
+    $("mnPill").className = "pill " + (on ? "on" : "off");
+    $("mnPill").textContent = on ? "スキャン待ち" : "タップで スキャン待ち";
+  }
+  scanIn.addEventListener("focus", pill);
+  scanIn.addEventListener("blur", function () { setTimeout(pill, 0); });
+  $("vMain").addEventListener("click", function (e) {
+    unlockAudio();
+    if (e.target.closest("button, a, input")) return;
+    focusScan();
+  });
+  $("mnPill").addEventListener("click", function () { focusScan(); });
+  $("kbBtn").addEventListener("click", function () {
+    kbMode = !kbMode;
+    scanIn.setAttribute("inputmode", kbMode ? "text" : "none");
+    scanIn.placeholder = kbMode ? "27-10001 と 打って Enter" : "スキャン待ち…";
+    $("kbBtn").classList.toggle("on", kbMode);
+    scanIn.blur(); focusScan();
+  });
+
+  // スキャナーは 打って Enter。Enter が 来ない スキャナー・日本語入力の 時も 少し 止まったら 読む（打つ モードは Enter だけ）。
+  var idleTimer = null;
+  scanIn.addEventListener("keydown", function (e) {
+    if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); clearTimeout(idleTimer); take(); }
+  });
+  scanIn.addEventListener("input", function () {
+    $("scanErr").textContent = "";
+    clearTimeout(idleTimer);
+    if (kbMode) return;
+    idleTimer = setTimeout(function () { if (looksComplete(scanIn.value)) take(); }, 300);
+  });
+  function take() { var v = scanIn.value; scanIn.value = ""; if (v.trim()) handle(v); }
+
+  function normalize(s) {
+    return String(s || "")
+      .replace(/[！-～]/g, function (ch) { return String.fromCharCode(ch.charCodeAt(0) - 0xFEE0); })
+      .replace(/[‐-―−ーｰ]/g, "-")
+      .replace(/\s+/g, "");
+  }
+  function looksComplete(s) { s = normalize(s); return /^\d{1,4}-[A-Za-z0-9]+$/.test(s) || (/[?&]id=[^&#]+/i.test(s) && /[?&](c|client)=[^&#]+/i.test(s)); }
+
+  // ラベル → {c, id}。「27-10001」・古い ラベルの アドレス（?c=…&id=… / ?client=…&id=…）。
+  // 品番だけ（打った 時）は いまの 得意先。
+  function parseCode(raw) {
+    var s = normalize(raw);
+    if (!s) return null;
+    var mc = s.match(/[?&](?:c|client)=([^&#]+)/i), mi = s.match(/[?&]id=([^&#]+)/i);
+    if (mc && mi) { try { return { c: decodeURIComponent(mc[1]), id: decodeURIComponent(mi[1]) }; } catch (e) { return { bad: s }; } }
+    var m = s.match(/^(\d{1,4})-([A-Za-z0-9-]+)$/);
+    if (m) return { c: m[1], id: m[2] };
+    if (/^[A-Za-z0-9-]{1,30}$/.test(s)) return cur ? { c: cur, id: s } : { bad: s, noClient: true };
+    return { bad: s };
+  }
+
+  function handle(raw) {
+    if (window.LocPad && LocPad.isOpen()) return;   // 場所の 入力中
+    if (!$("busy").classList.contains("hidden")) return;   // 保存中
+    var p = parseCode(raw);
+    if (!p) return;
+    if (p.noClient) { $("scanErr").textContent = "品番だけでは 得意先が わかりません — 27-10001 の 形で"; beep(false); return; }
+    if (p.bad) { $("scanErr").textContent = "読めない ラベル: " + p.bad.slice(0, 60); beep(false); return; }
+    if (mode === "shukko") { pickScan(String(p.c), String(p.id)); return; }
+    showItem(String(p.c), String(p.id));
+  }
+
+  function realStock(it) { return (parseInt(it.stock, 10) || 0) - (Number(it.yoyakuQty) || 0); }
+
+  // ══ 商品カード — 商品ページ（product.html）と 同じ 形 ══
+  //  上の 箱: 得意先・品番（— メモ）・商品名・在庫数。タブ: 基本情報 / 記録 / 場所（ラベル・場所の 変更は 商品ページで）。
+  //  場所は ピッキングで 一番 見る ので 基本情報の 一番 上に 大きく。
+  //  記録（api=kiroku）は 品物と 同時に 読む。読んだ 記録は この アプリが 開いている 間 覚える（同じ 品物は すぐ 出る）。
+  var tab = "info", kiroku = {}, cardItem = null;
+  var TABS = [["info", "基本情報"], ["kiroku", "記録"], ["location", "場所"], ["label", "🏷 ラベル"]];
+  function inDay(s) {   // 商品ページと 同じ 日付の 形（26/10/28）
+    var m = String(s == null ? "" : s).trim().match(/^(\d{4})\s*[\/\-.年]\s*(\d{1,2})\s*[\/\-.月]\s*(\d{1,2})/);
+    return m ? [m[1].slice(2), ("0" + m[2]).slice(-2), ("0" + m[3]).slice(-2)].join("/") : String(s == null ? "" : s);
+  }
+  function stamp(t) { var d = new Date(t); return d.getFullYear() + "/" + ("0" + (d.getMonth() + 1)).slice(-2) + "/" + ("0" + d.getDate()).slice(-2) + " " + hhmm(t); }
+  function heroHtml(c, id, it, state, stateCls, chg, warn) {
+    var real = it ? realStock(it) : null;
+    var pc = real == null ? "" : real <= 0 ? " zero" : real <= 10 ? " low" : "";
+    return '<div class="hero' + (warn ? " warn" : "") + '"><div class="hero-top"><div style="flex:1;min-width:0">' +
+        '<div class="hero-eyebrow"><span>ニシキ冷蔵株式会社</span><span class="state ' + (stateCls || "") + '" id="cardState">' + esc(state || "") + "</span></div>" +
+        '<div class="hero-client">' + esc(clientLabel(c)) + (chg ? '<span class="chg-tag">← 得意先が 変わりました</span>' : "") + "</div>" +
+        '<div class="hero-number">' + esc(id + (it && it.note ? " — " + it.note : "")) + "</div>" +
+        '<div class="hero-name">' + esc(it ? it.name || "" : "") + "</div>" +
+      "</div>" +
+      (real == null ? "" : '<div class="stock-pill' + pc + '"><div class="stock-num">' + real + '</div><div class="stock-label">在庫数</div></div>') +
+      "</div>" +
+      (it ? '<div class="tab-nav">' + TABS.map(function (t) {
+        return '<button type="button" class="tab-btn' + (t[0] === tab ? " active" : "") + '" data-tab="' + t[0] + '">' + t[1] +
+          (t[0] === "kiroku" ? '<span class="tab-n" id="kirokuN"></span>' : "") + "</button>";
+      }).join("") + "</div>" : "");
+  }
+  function renderItem(c, id, it, state, stateCls, changedClient) {
+    var real = realStock(it), y = Number(it.yoyakuQty) || 0, card = $("card");
+    cardItem = it;
+    card.className = "card"; card.setAttribute("data-c", c); card.setAttribute("data-id", id);
+    var cell = function (k, v) { return '<div class="info-cell"><div class="info-key">' + k + '</div><div class="info-val">' + esc(v === "" || v == null ? "—" : v) + "</div></div>"; };
+    card.innerHTML = heroHtml(c, id, it, state, stateCls, changedClient) + "</div>" +
+      '<div class="pane' + (tab === "info" ? " active" : "") + '" data-pane="info">' +
+        '<div class="sec-head">基本情報</div><div class="info-grid">' +
+          '<div class="info-cell full loc"><div class="info-key">場所</div><div class="info-val' + (it.location ? "" : " empty") + '">' + esc(it.location || "場所が ありません") + "</div></div>" +
+          cell("入庫日付", inDay(it.nyukoDate)) + cell("入庫元数", it.nyukoQty) +
+          cell("現在在庫", real + (it.nishikata ? " " + it.nishikata : "")) + cell("荷姿", it.nishikata) +
+        "</div>" +
+        '<div class="sec-head">予約状況</div>' +
+        (y > 0 ? '<div class="yoyaku"><div><div class="yk">予約あり</div><div class="yn">×' + esc(y) + '</div></div><div class="sub">出庫予定数（在庫数は 引いた 数）</div></div>'
+               : '<div class="empty-msg">予約なし</div>') +
+        '<div class="pane-foot"><button type="button" class="refresh-btn" id="refreshBtn">↻ データ更新</button>' +
+          '<button type="button" class="refresh-btn" id="openPage">🏷 ラベル印刷</button></div>' +
+        '<div class="updated-ts">最終更新: ' + stamp(Date.now()) + "</div>" +
+      "</div>" +
+      '<div class="pane' + (tab === "kiroku" ? " active" : "") + '" data-pane="kiroku"><div class="sec-head">記録</div><div id="kirokuArea"></div></div>' +
+      '<div class="pane' + (tab === "location" ? " active" : "") + '" data-pane="location"><div class="sec-head">現在の場所</div>' +
+        (it.location
+          ? '<div class="loc-row current"><div style="min-width:0"><div class="loc-date">現在地</div><div class="loc-name big">' + esc(it.location) + '</div></div><button type="button" class="loc-edit-btn" id="locEdit">✏️ 場所変更</button></div>'
+          : '<div class="loc-row"><div class="empty-msg" style="padding:0">場所情報なし</div><button type="button" class="loc-edit-btn" id="locEdit">✏️ 場所設定</button></div>') +
+        '<div class="sec-head">場所の記録（部屋移動・場所の変更）</div><div id="locHist"></div>' +
+      "</div>" + labelPaneHtml(c);
+    paintKiroku(c + "-" + id);
+    if (tab === "label") drawLabel(c, id, it);
+  }
+  function renderMsgCard(c, id, html, warn, chg) {
+    var card = $("card");
+    cardItem = null;
+    card.className = "card"; card.setAttribute("data-c", c); card.setAttribute("data-id", id);
+    card.innerHTML = heroHtml(c, id, null, "", "", chg, warn) + html + "</div>";
+  }
+  function setTab(t) {
+    tab = t;
+    var card = $("card");
+    Array.prototype.forEach.call(card.querySelectorAll("[data-tab]"), function (b) { b.classList.toggle("active", b.getAttribute("data-tab") === t); });
+    Array.prototype.forEach.call(card.querySelectorAll("[data-pane]"), function (p) { p.classList.toggle("active", p.getAttribute("data-pane") === t); });
+    if (t === "label") drawLabel(card.getAttribute("data-c"), card.getAttribute("data-id"), cardItem);
+  }
+  $("card").addEventListener("click", function (e) {
+    var b = e.target.closest("button"), card = $("card"); if (!b) return;
+    var c = card.getAttribute("data-c"), id = card.getAttribute("data-id");
+    if (b.hasAttribute("data-tab")) setTab(b.getAttribute("data-tab"));
+    else if (b.id === "locEdit") openLocEdit(c, id);
+    else if (b.id === "openPage") setTab("label");
+    else if (b.id === "lblPrint") { shareOrPrintLabel(); return; }
+    else if (b.hasAttribute("data-lst")) { lblStyle = b.getAttribute("data-lst"); drawLabel(c, id, cardItem); }
+    else if (b.id === "refreshBtn") showItem(c, id, true);
+    else return;
+    focusScan();
+  });
+
+  function loadKiroku(c, id) {
+    var key = c + "-" + id, k = kiroku[key] || (kiroku[key] = {});
+    k.err = "";
+    apiGet({ api: "kiroku", client: c, id: id }).then(function (j) {
+      k.d = j.kiroku || { entry: null, out: [], edit: [], loc: [] }; k.at = Date.now(); paintKiroku(key);
+    }).catch(function (e) { if (e && e.auth) return; k.err = (e && e.message) || String(e); paintKiroku(key); });
+  }
+  // 記録の 中身 — 商品ページの renderKiroku と 同じ（入庫・出庫/検品・部屋移動・場所・修正。新しい 順）
+  function kirokuEvents(d, p) {
+    var e = d.entry || {}; p = p || {};
+    var slash = function (s) { return String(s || "").replace(/-/g, "/"); };
+    var isMove = function (l) { return /部屋移動/.test(l.kind || ""); };
+    var inQty = e.qty != null && e.qty !== "" ? e.qty : p.nyukoQty;
+    return [{ d: slash(e.date || p.nyukoDate), t: "", kind: '<span class="k-in">入庫</span>', qty: inQty, left: inQty, sub: [], cx: false }]
+      .concat((d.out || []).map(function (o) {   // [出庫日, 出庫数, 最終在庫, 運送, 引取先, 担当者, 伝票ID, 取消, 予約, 時刻, 出庫ID]
+        return { d: o[0], t: o[9] || "", cx: !!o[7],
+          kind: (o[1] === 0 ? '<span class="k-kp">検品</span>' : '<span class="k-out">出庫</span>') + (o[8] === "予約" ? ' <span class="kr-tag yy">予約</span>' : ""),
+          qty: o[1] === 0 ? "" : o[1], left: o[2], sub: [o[4], o[3], o[5], [o[6], o[10]].filter(Boolean).join(" · ")] };
+      }))
+      .concat((d.loc || []).map(function (l) {
+        return { d: String(l.datetime).slice(0, 10), t: String(l.datetime).slice(11, 16), cx: false,
+          kind: (isMove(l) ? '<span class="k-move">部屋移動' + (/一部/.test(l.kind) ? "（一部）" : "") + "</span> " : '<span class="k-loc">場所</span> ') +
+            esc(l.oldLocation || "空欄") + " → <b>" + esc(l.newLocation || "空欄") + "</b>",
+          qty: isMove(l) ? l.qty : "", left: "", sub: [l.changedBy] };
+      }))
+      .concat((d.edit || []).map(function (x) {   // 入庫の 修正 [日時, 項目, 変更前, 変更後, 担当]
+        return { d: String(x[0]).slice(0, 10), t: String(x[0]).slice(11, 16), cx: false,
+          kind: x[1] === "キャンセル" ? '<span class="k-fix">入庫取消</span>' : '<span class="k-fix">修正</span> ' + esc(x[1]) + ": " + esc(x[2] || "空欄") + " → <b>" + esc(x[3] || "空欄") + "</b>",
+          qty: "", left: "", sub: [x[4]] };
+      }))
+      .sort(function (a, b) { var x = a.d + a.t, y = b.d + b.t; return x < y ? 1 : x > y ? -1 : 0; });
+  }
+  function kirokuRow(x) {
+    var has = function (v) { return v !== "" && v != null; };
+    var sub = x.sub.filter(has).map(esc).join(" · ");
+    return '<div class="kv' + (x.cx ? " cx" : "") + '"><div class="kv-d">' + esc(inDay(x.d)) + (x.t ? "<span>" + esc(x.t) + "</span>" : "") + "</div>" +
+      '<div><div class="kv-k">' + x.kind + (x.cx ? ' <span class="kr-tag">取消</span>' : "") + "</div>" + (sub ? '<div class="kv-sub">' + sub + "</div>" : "") + "</div>" +
+      '<div class="kv-n">' + (has(x.qty) ? '<span class="kv-q">' + esc(x.qty) + "</span>" : "") + (has(x.left) ? '<span class="kv-left">残り ' + esc(x.left) + "</span>" : "") + "</div></div>";
+  }
+  function locHistHtml(loc) {
+    if (!loc || !loc.length) return '<div class="empty-msg">場所移動履歴が ありません</div>';
+    return loc.map(function (h, i) {
+      var mv = /部屋移動/.test(h.kind || "");
+      return '<div class="loc-row' + (i === 0 ? " current" : "") + '"><div style="min-width:0">' +
+        '<div class="loc-name" style="font-size:14px">' + (h.oldLocation ? esc(h.oldLocation) + " → " : "") + esc(h.newLocation) + "</div>" +
+        '<div class="loc-date" style="margin-top:3px">' + (mv ? '<span class="badge badge-move">' + esc(h.kind) + (h.qty !== "" && h.qty != null ? " " + esc(h.qty) : "") + "</span> " : "") + esc(h.changedBy || "—") + "</div></div>" +
+        '<div style="text-align:right;flex:none"><div class="loc-date">' + esc(h.datetime || "—") + "</div>" +
+        (i === 0 ? '<span class="badge badge-blue" style="margin-top:4px;display:inline-block">最新</span>' : "") + "</div></div>";
+    }).join("");
+  }
+  function paintKiroku(key) {
+    var card = $("card");
+    if (card.getAttribute("data-c") + "-" + card.getAttribute("data-id") !== key) return;
+    var area = $("kirokuArea"), hist = $("locHist"), n = $("kirokuN");
+    if (!area || !hist) return;
+    var k = kiroku[key] || {};
+    if (!k.d) {
+      var m = '<div class="empty-msg">' + (k.err ? "記録を 読めませんでした: " + esc(k.err) : "読み込み中…") + "</div>";
+      area.innerHTML = m; hist.innerHTML = m; if (n) n.textContent = ""; return;
+    }
+    var ev = kirokuEvents(k.d, cardItem);
+    if (n) n.textContent = ev.length;
+    area.innerHTML = '<div class="kv-h"><span>日付</span><span>内容</span><span>数・残り在庫</span></div>' + ev.map(kirokuRow).join("");
+    hist.innerHTML = locHistHtml(k.d.loc);
+  }
+  // ══ メニュー（出庫・入庫・棚卸・在庫 検索）══
+  var mode = "home";
+  var MODE_TITLE = { home: "メニュー", lookup: "在庫 検索", shukko: "出庫" };
+  function setMode(m) {
+    mode = m;
+    $("homeView").classList.toggle("hidden", m !== "home");
+    $("workView").classList.toggle("hidden", m === "home");
+    $("lookupView").classList.toggle("hidden", m !== "lookup");
+    $("clientBar").classList.toggle("hidden", m !== "lookup");
+    $("pickView").classList.toggle("hidden", m !== "shukko");
+    $("backBtn").classList.toggle("hidden", m === "home");
+    $("mnPill").classList.toggle("hidden", m === "home");
+    $("mnTitle").textContent = MODE_TITLE[m] || "";
+    $("scanErr").textContent = ""; $("homeMsg").textContent = "";
+    if (m === "home") closeCam();
+    hidePop();
+    if (m === "shukko") pickEnter();
+    if (m !== "home") focusScan();
+    window.scrollTo(0, 0);
+  }
+  $("homeView").addEventListener("click", function (e) {
+    var b = e.target.closest("[data-mode]"); if (!b) return;
+    unlockAudio();
+    if (b.classList.contains("soon")) { $("homeMsg").textContent = b.querySelector("b").textContent + " は 準備中です"; return; }
+    setMode(b.getAttribute("data-mode"));
+  });
+  $("backBtn").addEventListener("click", function () {
+    if (mode === "shukko" && pk.open) { pk.open = ""; pk.msg = null; renderPick(); window.scrollTo(0, 0); focusScan(); return; }
+    setMode("home");
+  });
+
+  // ══ 出庫 ピッキング（upload 118）══
+  //  その 日の 出庫（PC の 出庫入力で 作った 伝票）を 開いて、品物の ラベルを 1回 読むと その 行に ✓（数は 大きく 出す）。
+  //  ・ちがう 得意先・この 伝票に ない 品番・同じ 商品の ちがう ロット → 赤で 止める（低い 音 2回）。
+  //  ・伝票の ロットより 古い ロットが 在庫に ある（先入れ先出し）→ 黄色で 知らせる だけ（✓ は つく）。
+  //  ・一覧で ラベルを 読むと、その 品番が 入った 伝票が 開く。
+  //  ・✓ は サーバー（シート「ピッキング記録」）に 送る → ほかの スマホ・PC でも 見える（20秒ごとに 読み直す）。
+  //    電波が 無い 時は この 端末に 貯めて あとで 送る（未送信 n）。
+  var PQ_KEY = "nishiki_scan_pickq";
+  var pk = { date: dayStr(new Date()), slips: null, loadedDate: "", loading: false, err: "", open: "", msg: null, seq: 0,
+             server: {}, serverDate: "", sending: false, timer: null, ver: 0 };
+  var pickQ = (lsJson(PQ_KEY) || []).filter(function (q) { return Date.now() - q.at < 7 * 864e5; });
+  var WD = "日月火水木金土";
+  function dayStr(d) { return d.getFullYear() + "/" + ("0" + (d.getMonth() + 1)).slice(-2) + "/" + ("0" + d.getDate()).slice(-2); }
+  function dayShift(s, n) { var a = s.split("/"); return dayStr(new Date(+a[0], a[1] - 1, +a[2] + n)); }
+  function dayLabel(s) {
+    var a = s.split("/"), d = new Date(+a[0], a[1] - 1, +a[2]);
+    return a[0].slice(2) + "/" + a[1] + "/" + a[2] + "（" + WD[d.getDay()] + "）" + (s === dayStr(new Date()) ? " 今日" : "");
+  }
+  function dateNum(s) { var m = String(s || "").match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/); return m ? +m[1] * 10000 + +m[2] * 100 + +m[3] : 0; }
+  function locKey(s) { return String(s || "～").replace(/\d+/g, function (n) { return ("0000" + n).slice(-5); }); }
+  function normName(s) { return normalize(s).toLowerCase(); }
+  function slipByKey(k) { return (pk.slips || []).filter(function (s) { return s.key === k; })[0] || null; }
+  function unitOf(c, id) { var it = lists[c] && lists[c].items[id]; return (it && it.nishikata) || ""; }
+  function pickMsg(kind, code, text, line, extra) { pk.msg = { kind: kind, code: code, text: text, line: line || "" }; if (mode === "shukko") showPop(kind, code, text, extra); }
+  // 入庫日 を 商品名の 前に — 同じ 商品が 多いので どの 入庫か 分かる よう（2026-11-13）
+  function inTxt(d) { var t = inDay(d); return t ? t + " 入庫 " : ""; }
+  // ✓ の ポップアップは 1行ずつ — 入庫日 / 品名 / 出庫数（2026-11-13）
+  function popLines(d, name, qty) { var t = inDay(d); return [t ? t + " 入庫" : "", name, qty].filter(Boolean).join("\n"); }
+  // ══ スキャン結果の ポップアップ — ✓ は 自動で 消える、✕（ちがう）と ⚠（もう 済み・古い ロット）は OK を 押すまで ══
+  var popTimer = null, popHold = false;
+  function showPop(kind, code, text, extra) {
+    var i = text.indexOf(" — "), t = i < 0 ? text : text.slice(0, i), sub = i < 0 ? "" : text.slice(i + 3);
+    clearTimeout(popTimer);
+    $("pop").className = "pop " + kind;
+    $("popIc").textContent = kind === "ok" ? "✓" : kind === "bad" ? "✕" : (t.charAt(0) === "✓" ? "✓" : "!");
+    $("popCode").textContent = code || "";
+    $("popT").textContent = t.replace(/^✓ /, "");   // 改行 あり（.pop-t は pre-line）
+    $("popS").textContent = sub;
+    $("popX").innerHTML = extra || "";
+    popHold = kind !== "ok" || !!extra;   // 合計・同じ 列が ある 時は OK を 押すまで
+    $("popOk").classList.toggle("hidden", !popHold);
+    if (!popHold) popTimer = setTimeout(hidePop, 1300);
+  }
+  function hidePop() { var was = !$("pop").classList.contains("hidden"); clearTimeout(popTimer); popHold = false; $("pop").className = "pop hidden"; if (was && mode !== "home") focusScan(); }
+  $("popOk").addEventListener("click", hidePop);
+  $("pop").addEventListener("click", function (e) { if (!popHold && e.target !== $("popOk")) hidePop(); });   // ✓ は どこを 押しても 消える
+  function saveQ() { lsSet(PQ_KEY, JSON.stringify(pickQ)); }
+
+  // いまの ✓ = サーバーの ✓ ＋ まだ 送って いない 分
+  function slipLines(s) {
+    var m = {}, sv = (pk.serverDate === pk.date && pk.server[s.key]) || {};
+    Object.keys(sv).forEach(function (id) { m[id] = sv[id]; });
+    pickQ.forEach(function (q) {
+      if (q.date !== pk.date || q.key !== s.key) return;
+      if (q.on) m[q.id] = { at: q.at, by: user, hand: q.hand, wait: true }; else delete m[q.id];
+    });
+    return m;
+  }
+  function shipped(s) { return slipLines(s)["🚚"] || null; }   // 🚚 出庫済み（確定した 人・時刻）
+  // 出庫お知らせ — 15:30 = 印刷から 2時間 以上（13:30 まで・前の日）、16:15 = 全部。今日だけ。
+  var alertDone = "";
+  function lateSlips() {
+    var now = new Date(), hm = now.getHours() * 100 + now.getMinutes(), ph = hm >= 1615 ? "1615" : hm >= 1530 ? "1530" : "";
+    if (!ph || pk.date !== dayStr(now) || !pk.slips) return { ph: "", list: [] };
+    var today = pk.date.split("/").join("");
+    return { ph: ph, list: pk.slips.filter(function (x) {
+      if (shipped(x)) return false;
+      var dk = x.key.slice(x.key.indexOf("_") + 1);
+      return ph === "1615" || (dk.charAt(8) === "_" && dk.slice(0, 8) < today) || (!!x.time && x.time <= "13:30");
+    }) };
+  }
+  function alertHtml() {
+    var a = lateSlips(); if (!a.list.length) return "";
+    if (alertDone !== pk.date + a.ph) { alertDone = pk.date + a.ph; beep(false); setTimeout(function () { beep(false); }, 700); }
+    return '<div class="pk-alert">⚠ 出庫お知らせ（' + (a.ph === "1615" ? "16:15 — 締めの 前" : "15:30 — 2時間 以上 前") + "）まだ 出庫済みで ない 伝票 " + a.list.length + " 件" +
+      "<span>" + a.list.map(function (x) { var n = slipCount(x); return esc((x.time || "—") + " " + x.client + ([x.hikitori ? "引取先 " + x.hikitori : "", x.tantou ? "担当 " + x.tantou : ""].filter(Boolean).map(function (v) { return " · " + v; }).join("")) + "（" + (n === x.lines.length ? "積み込み待ち" : n ? "ピッキング中 " + n + "/" + x.lines.length : "まだ") + "）"); }).join("<br>") + "</span></div>";
+  }
+  function slipCount(s) { var m = slipLines(s), n = 0; s.lines.forEach(function (l) { if (m[l.id]) n++; }); return n; }
+  function slipWho(s) {
+    var m = slipLines(s), by = {}, last = null;
+    Object.keys(m).forEach(function (id) { by[m[id].by || "?"] = 1; if (!last || m[id].at > last.at) last = m[id]; });
+    return { names: Object.keys(by), last: last };
+  }
+
+  function pickEnter() {
+    if (!pk.slips || pk.loadedDate !== pk.date) loadSlips(); else { renderPick(); refreshPicks(); }
+    clearInterval(pk.timer);
+    pk.timer = setInterval(function () { if (mode === "shukko" && !document.hidden) { refreshPicks(); flushQ(); } }, 20000);
+  }
+  // 古い 返事で 新しい ✓ を 消さない: 読み始めた 後に ✓ を 送った / 送って いる 時は その 返事の ✓ は 使わない
+  function freshPicks(date, v) { return pk.serverDate !== date || (pk.ver === v && !pk.sending && !pickQ.length); }
+  function loadSlips() {
+    var my = ++pk.seq, date = pk.date, v = pk.ver;
+    pk.loading = true; pk.err = ""; renderPick();
+    apiGet({ api: "shukko", date: date }).then(function (j) {
+      if (my !== pk.seq) return;
+      pk.slips = (j.slips || []).map(function (s) {
+        s.c = String(s.c); s.lines = (s.lines || []).filter(function (l) { return Number(l.qty) > 0; });
+        s.lines.forEach(function (l) { l.id = String(l.id); });
+        return s;
+      }).filter(function (s) { return s.lines.length; })
+        .sort(function (a, b) { return a.time < b.time ? -1 : a.time > b.time ? 1 : Number(a.c) - Number(b.c); });
+      if (freshPicks(date, v)) { pk.server = j.picks || {}; pk.serverDate = date; }
+      pk.loadedDate = date;
+      if (pk.open && !slipByKey(pk.open)) pk.open = "";
+    }).catch(function (e) { if (my === pk.seq && !e.auth) pk.err = e.message || String(e); })
+      .then(function () { if (my === pk.seq) { pk.loading = false; renderPick(); flushQ(); } });
+  }
+  // ✓ だけ 読み直す（軽い）— ほかの スマホの ✓ も 出る
+  function refreshPicks() {
+    var date = pk.date, v = pk.ver;
+    apiGet({ api: "picks", date: date }).then(function (j) {
+      if (date !== pk.date || !freshPicks(date, v)) return;
+      pk.server = j.picks || {}; pk.serverDate = date; renderPick();
+    }).catch(function () {});
+  }
+  // 貯めた ✓ を 順に 送る
+  function flushQ() {
+    if (pk.sending || !pickQ.length) return;
+    var q = pickQ[0];
+    pk.sending = true;
+    apiPost({ api: "pick", date: q.date, key: q.key, client: q.c, id: q.id, on: q.on, hand: q.hand })
+      .then(function (j) {
+        pickQ.shift(); saveQ(); pk.ver++;
+        if (q.date === pk.date && pk.serverDate === pk.date) pk.server[q.key] = j.lines || {};
+        pk.sending = false; renderPick(); flushQ();
+      })
+      .catch(function (e) {
+        pk.sending = false;
+        if (e && e.final) { pickQ.shift(); saveQ(); pickMsg("bad", q.c + "-" + q.id, "送れませんでした: " + e.message); renderPick(); flushQ(); }
+        else renderPick();   // 電波など — 次に また 送る
+      });
+  }
+  function queuePick(s, id, on, hand) {
+    pickQ.push({ date: pk.date, key: s.key, c: s.c, id: id, on: !!on, hand: !!hand, at: Date.now() }); pk.ver++;
+    saveQ(); flushQ();
+  }
+
+  function openSlip(key) {
+    var s = slipByKey(key); if (!s) return null;
+    pk.open = key; pk.msg = null;
+    useClient(s.c, false);   // 先入れ先出しの ために その 得意先の 商品を 先読み（覚えて いれば すぐ）
+    refreshPicks();
+    return s;
+  }
+
+  // 先入れ先出し: 同じ 商品名で 入庫日が 古く、在庫（予約を 引いた 数）が ある ロット（この 伝票の 品番は 除く）
+  function olderLots(s, l) {
+    var L = lists[s.c]; if (!L || !L.items) return [];
+    var nm = normName(l.name), d0 = dateNum(l.nyukoDate), mine = {};
+    if (!nm || !d0) return [];
+    s.lines.forEach(function (x) { mine[x.id] = 1; });
+    return Object.keys(L.items).map(function (k) { return L.items[k]; }).filter(function (it) {
+      var d = dateNum(it.nyukoDate);
+      return !mine[String(it.number)] && normName(it.name) === nm && realStock(it) > 0 && d && d < d0;
+    }).sort(function (a, b) { return dateNum(a.nyukoDate) - dateNum(b.nyukoDate); });
+  }
+
+  function renderPick() {
+    if (mode !== "shukko") return;
+    var s = pk.open && slipByKey(pk.open);
+    $("mnTitle").textContent = s ? "出庫 ピッキング" : "出庫";
+    $("pickView").classList.toggle("open", !!s);
+    renderSlipList(!!s);
+    if (s) renderSlip(s);
+    else $("pickSlip").innerHTML = '<div class="pk-empty"><b>←</b>伝票を えらぶ か、品物の ラベルを スキャン<br><span class="sub">その 品番の 伝票が ここに 開きます</span></div>';
+  }
+  function msgHtml() {
+    var m = pk.msg; if (!m) return "";
+    return '<div class="pk-msg ' + m.kind + '"><span class="pk-code">' + esc(m.code) + "</span>" + esc(m.text) + "</div>";
+  }
+  function qNote() {
+    var n = pickQ.filter(function (q) { return q.date === pk.date; }).length;
+    return n ? '<div class="pk-q">📶 未送信 ' + n + " — 電波が 戻ったら 送ります</div>" : "";
+  }
+  // 一覧の まとめ方 — GROUP_TANTOU の 得意先は 担当者ごと、ほかは 引取先ごと（2026-11-13）
+  var GROUP_TANTOU = { "27": 1 };
+  function grpOf(s) { return String((GROUP_TANTOU[s.c] ? s.tantou : s.hikitori) || ""); }
+  function grpLabel(c) { return GROUP_TANTOU[c] ? "担当" : "引取先"; }
+  function renderSlipList(open) {   // open = 伝票を 開いて いる（メッセージは 伝票の 方に 出す）
+    var slips = pk.slips || [], done = 0, wait = 0, firstOf = {};
+    slips.forEach(function (s) { if (shipped(s)) done++; else if (slipCount(s) === s.lines.length) wait++; });
+    slips.forEach(function (s, i) { var d = !!shipped(s); [s.c + "|" + d, s.c + "|" + d + "|" + grpOf(s)].forEach(function (k) { if (firstOf[k] == null) firstOf[k] = i; }); });
+    $("pickList").innerHTML =
+      '<div class="pk-date"><button type="button" class="refresh-btn" data-pk="prev">‹ 前の日</button><b>' + esc(dayLabel(pk.date)) +
+        '</b><button type="button" class="refresh-btn" data-pk="next">次の日 ›</button></div>' +
+      alertHtml() + (open ? "" : msgHtml() + qNote()) +
+      '<div class="pk-sum">' + (pk.loading ? "読み込み中…" : pk.err ? '<span class="err">読めませんでした: ' + esc(pk.err) + "</span>" :
+        "伝票 " + slips.length + (wait ? "・積み込み待ち " + wait : "") + "・出庫済み " + done) + '<button type="button" class="link" data-pk="reload">↻ 読み直す</button></div>' +
+      (!pk.loading && !pk.err && !slips.length ? '<div class="hint">この 日の 出庫は ありません</div>' : "") +
+      (slips.length ? '<div class="pk-hint">伝票を えらぶ か、品物の ラベルを スキャン → その 品番の 伝票が 開きます</div>' : "") +
+      slips.map(function (s, i) { return { s: s, i: i, d: !!shipped(s) }; })
+        .sort(function (a, b) {   // 済んだ 伝票は 下へ。あとは 得意先 → 担当者 / 引取先 → 時刻
+          var fa = firstOf[a.s.c + "|" + a.d], fb = firstOf[b.s.c + "|" + b.d], ga = firstOf[a.s.c + "|" + a.d + "|" + grpOf(a.s)], gb = firstOf[b.s.c + "|" + b.d + "|" + grpOf(b.s)];
+          return (a.d - b.d) || (fa - fb) || (ga - gb) || (a.i - b.i); })
+        .map(function (o, j, arr) {
+        var s = o.s, n = slipCount(s), all = s.lines.length, ok = o.d, full = n === all, sh = shipped(s), who = slipWho(s), pv = j ? arr[j - 1] : null;
+        var newC = !pv || pv.d !== o.d || pv.s.c !== s.c, newG = newC || grpOf(pv.s) !== grpOf(s);
+        var cnt = arr.filter(function (x) { return x.d === o.d && x.s.c === s.c; }).length;
+        return (ok && (j === 0 || !arr[j - 1].d) ? '<div class="pk-sep">🚚 出庫済み ' + done + "</div>" : "") +
+          (newC ? '<div class="pk-g"><b>' + esc(s.client) + "</b><span>伝票 " + cnt + "</span></div>" : "") +
+          (newG ? '<div class="pk-g2"><small>' + grpLabel(s.c) + "</small>" + esc(grpOf(s) || "—") + "</div>" : "") +
+          '<button type="button" class="slip' + (ok ? " done" : full ? " ldw" : "") + (s.key === pk.open ? " cur" : "") + '" data-slip="' + esc(s.key) + '">' +
+          '<div class="slip-top"><span class="slip-time">' + esc(s.time || "—") + '</span><span class="slip-cl">' + esc(s.client) + "</span>" +
+            (ok ? '<span class="slip-tag sh">🚚 ' + (sh.at ? hhmm(sh.at) : "") + "</span>" : full ? '<span class="slip-tag ld">🚚 積み込み待ち</span>' : n ? '<span class="slip-tag">ピッキング中</span>' : "") +
+            '<span class="slip-n' + (full ? " ok" : n ? " mid" : "") + '">' + (ok ? "✓" : n + " / " + all) + "</span></div>" +
+          '<div class="slip-sub">' + esc([s.hikitori, s.unso, s.tantou].filter(Boolean).join(" · ") || "—") + " · " + all + " 行" +
+            (who.names.length ? ' <span class="slip-who">' + (ok ? "✓ " : "") + esc(who.names.join("・")) + "</span>" : "") + "</div>" +
+          '<div class="pbar"><i style="width:' + Math.round(n * 100 / all) + '%"></i></div></button>';
+      }).join("");
+  }
+  function renderSlip(s) {
+    var m = slipLines(s), n = slipCount(s), all = s.lines.length, ok = n === all;
+    var lines = s.lines.slice().sort(function (a, b) { var x = locKey(a.loc), y = locKey(b.loc); return x < y ? -1 : x > y ? 1 : 0; });
+    var sh = m["🚚"] || null, ats = s.lines.map(function (l) { return (m[l.id] && m[l.id].at) || 0; }).filter(Boolean);
+    var took = ok && ats.length > 1 ? Math.round((Math.max.apply(null, ats) - Math.min.apply(null, ats)) / 1000) : 0;
+    $("pickSlip").innerHTML =
+      '<div class="hero pk-hero"><div class="hero-top"><div style="flex:1;min-width:0">' +
+          '<div class="hero-eyebrow"><span>出庫 · ' + esc(dayLabel(pk.date)) + " · " + esc(s.time || "") + "</span></div>" +
+          '<div class="hero-number pk-cl">' + esc(s.client) + "</div>" +
+          '<div class="hero-name">' + esc([s.hikitori, s.unso, s.tantou].filter(Boolean).join(" · ") || "—") + "</div>" +
+        "</div>" +
+        '<div class="stock-pill' + (ok ? "" : n ? " low" : " zero") + '"><div class="stock-num">' + n + "/" + all + '</div><div class="stock-label">チェック</div></div>' +
+      '</div><div class="pbar big"><i style="width:' + Math.round(n * 100 / all) + '%"></i></div></div>' +
+      msgHtml() + qNote() +
+      (sh ? '<div class="shipped"><div>🚚 出庫 済み<small>' + (sh.at ? hhmm(sh.at) + " " : "") + esc(sh.by || "") + " が 確定" + (sh.wait ? "・未送信" : "") + '</small></div><button type="button" data-pk="unship">確定を 取り消す</button></div>'
+        : ok ? '<div class="ld"><div class="ld-t">✓ ピッキング 完了 — 積み込み待ち</div><div class="ld-s">トラックに 積んだら 押す → 出庫 確定。押すまで 出庫済みに なりません。' +
+          (took ? "（" + Math.floor(took / 60) + "分" + (took % 60) + "秒）" : "") + '</div><button type="button" class="ld-btn" data-pk="ship">🚚 トラックに 積んだ</button></div>' : "") +
+      (sh ? "" : rowStrips(s)) +
+      '<div class="pane active pk-lines"><div class="sec-head">場所の 順・ラベルを 読むと ✓</div>' +
+      lines.map(function (l) {
+        var d = m[l.id], old = olderLots(s, l), u = unitOf(s.c, l.id), pp = palOf(s, l.id), ps = palSum(s, l.id);
+        return '<div class="pl' + (d ? " ok" : ps ? " part" : "") + (d && d.hand ? " hand" : "") + (sh ? " gone" : "") + (pk.msg && pk.msg.line === l.id ? " last" : "") + '" data-line="' + esc(l.id) + '">' +
+          '<div class="pl-loc">' + esc(l.loc || "—") + "</div>" +
+          '<div class="pl-main"><div class="pl-id">' + esc(l.id) + (l.yoyaku ? ' <span class="kr-tag yy">予約</span>' : "") + "</div>" +
+            '<div class="pl-name">' + esc(l.name) + "</div>" +
+            '<div class="pl-in">入庫 ' + esc(inDay(l.nyukoDate) || "—") +
+              (d ? " · ✓ " + esc(d.by || "") + (d.at ? " " + hhmm(d.at) : "") + (d.hand ? "（手）" : "") + (d.wait ? " 未送信" : "") : "") + "</div>" +
+            (pp.length ? '<div class="pl-pal">' + pp.map(function (p, i) { return "P" + (i + 1) + "：" + esc(palTxt(p)); }).join("　") + "</div>" : "") +
+            (old.length && !d ? '<div class="pl-fifo">⚠ 先入れ先出し: もっと 古い ロット ' + esc(old[0].number) + "（" + esc(inDay(old[0].nyukoDate)) + " 入庫・" +
+              esc(old[0].location || "場所なし") + "・在庫 " + realStock(old[0]) + "）" + (old.length > 1 ? " ほか " + (old.length - 1) : "") + "</div>" : "") +
+          "</div>" +
+          '<div class="pl-qty"><b>' + esc(l.qty) + "</b><span>" + esc(u) + "</span></div>" +
+          '<div class="pl-st">' + (d ? (d.hand ? "手" : "✓") : ps ? ps + "/" + esc(l.qty) : "") + "</div></div>";
+      }).join("") +
+      '<div class="pk-foot"><button type="button" class="link" data-pk="reset">この 伝票の チェックを やり直す</button></div></div>';
+  }
+
+  // ラベルを 読んだ 時（出庫 モード）
+  //  key = 「どの 伝票ですか？」で 選んだ 伝票（その 伝票を 開いて ✓）
+  function pickScan(c, id, key) {
+    var code = c + "-" + id;
+    if (!key && !$("slipAsk").classList.contains("hidden")) { beep(false); return; }   // 選ぶ 画面が 出て いる 間は 読まない
+    if (!$("handAsk").classList.contains("hidden") || !$("rowList").classList.contains("hidden") || !$("qtyAsk").classList.contains("hidden")) { beep(false); return; }
+    if (popHold) { beep(false); var pc = $("pop").querySelector(".pop-card"); pc.classList.remove("shake"); void pc.offsetWidth; pc.classList.add("shake"); return; }
+    if (!pk.slips) { pickMsg("bad", code, "伝票を 読み込み中です — 少し 待って もう一度"); beep(false); renderPick(); return; }
+    var s = key ? openSlip(key) : (pk.open && slipByKey(pk.open));
+    if (key && !s) { pickMsg("bad", code, "伝票が 見つかりません — ↻ 読み直して もう一度"); beep(false); renderPick(); return; }
+    if (key) window.scrollTo(0, 0);
+    if (!s) {   // 一覧 — その 品番の 伝票を 開く。まだ ✓ して いない 伝票が 2枚 以上 あれば どれか 聞く
+      var hits = pk.slips.filter(function (x) { return x.c === c && x.lines.some(function (l) { return l.id === id; }); });
+      if (!hits.length) { pickMsg("bad", code, "商品が ちがいます — この 日の 伝票に ない 商品です"); beep(false); renderPick(); return; }
+      var todo = hits.filter(function (x) { return !shipped(x) && !slipLines(x)[id]; });
+      if (todo.length > 1) { askSlip(c, id, todo); return; }
+      s = openSlip((todo[0] || hits.filter(function (x) { return slipCount(x) < x.lines.length; })[0] || hits[0]).key);
+      window.scrollTo(0, 0);
+    }
+    if (!key && !(s.c === c && !shipped(s) && !slipLines(s)[id] && s.lines.some(function (l) { return l.id === id; }))) {   // 開いて いる 伝票の 分は 済み / 無い → ほかの 伝票
+      var td = pk.slips.filter(function (x) { return x.c === c && !shipped(x) && !slipLines(x)[id] && x.lines.some(function (l) { return l.id === id; }); });
+      if (td.length > 1) { askSlip(c, id, td); return; }
+      if (td.length === 1) { s = openSlip(td[0].key); window.scrollTo(0, 0); }
+    }
+    if (c !== s.c) { pickMsg("bad", code, "得意先が ちがいます — この 伝票は " + s.client); beep(false); renderPick(); return; }
+    var l = s.lines.filter(function (x) { return x.id === id; })[0];
+    if (!l) {
+      var it = lists[c] && lists[c].items[id];
+      var same = it ? s.lines.filter(function (x) { return normName(x.name) === normName(it.name); })[0] : null;
+      pickMsg("bad", code, same ? "入庫日が ちがいます — 同じ 商品の 別の 入庫日です（スキャン " + inDay(it.nyukoDate) + " 入庫）。伝票は " + same.id + "（" + inDay(same.nyukoDate) + " 入庫・" + (same.loc || "場所なし") + "）"
+                               : it ? "商品が ちがいます — 伝票に ない 商品です（" + inTxt(it.nyukoDate) + it.name + "）" : "品番が ちがいます — この 伝票に ない 品番です");
+      beep(false); renderPick(); return;
+    }
+    var had = slipLines(s)[l.id];
+    if (had) { pickMsg("warn", code, "もう チェック 済みです（" + (had.by ? had.by + " " : "") + inTxt(l.nyukoDate) + l.name + "）", l.id); beep(false); renderPick(); return; }
+    if (QTY_CONFIRM && needOf(l) > 0) { tone(880, 0, 0.1); renderPick(); openQty(s, l, false); return; }   // 数を 数えてから ✓
+    var old = olderLots(s, l);
+    queuePick(s, l.id, true, false);
+    pickMsg(old.length ? "warn" : "ok", code, "✓ " + popLines(l.nyukoDate, l.name, l.qty + " " + unitOf(c, l.id)) +
+      (old.length ? " — ⚠ もっと 古い ロット " + old[0].number + "（" + inDay(old[0].nyukoDate) + "・" + (old[0].location || "場所なし") + "）が あります" : ""), l.id);
+    beep(true); renderPick();
+  }
+  // ══ 数の 確認（2026-11-13）— ラベルが 合ったら パレットごとに 数える。合計が 伝票の 数に なったら ✓ ══
+  //   10 以上 = 段 × 1段の 数 ＋ バラ、10 より 少ない = 数だけ。足りない 時は 記録して、次の パレットを もう一度 スキャン。
+  var QTY_CONFIRM = true;   // false = 前の 流れ（スキャン → すぐ ✓）
+  var PAL_KEY = "nishiki_scan_pal", pal = {}, qa = null;
+  try { pal = JSON.parse(lsGet(PAL_KEY) || "{}") || {}; } catch (e) { pal = {}; }
+  function palKey(s, id) { return pk.date + "|" + s.key + "|" + id; }
+  function palOf(s, id) { return pal[palKey(s, id)] || []; }
+  function palSum(s, id) { return palOf(s, id).reduce(function (a, p) { return a + p.n; }, 0); }
+  function palClear(s, id) { delete pal[palKey(s, id)]; lsSet(PAL_KEY, JSON.stringify(pal)); }
+  function palTxt(p) { return p.d ? p.d + "段 × " + p.p + (p.b ? " ＋ " + p.b : "") + " ＝ " + p.n : String(p.n); }
+  function needOf(l) { var n = parseFloat(l.qty); return n > 0 && n === Math.floor(n) ? n : 0; }
+  function openQty(s, l, hand) {
+    var left = needOf(l) - palSum(s, l.id);
+    qa = { key: s.key, id: l.id, hand: !!hand, left: left, dan: left >= 10, v: { d: "", p: "", b: "", n: "" }, f: left >= 10 ? "d" : "n" };
+    var u = unitOf(s.c, l.id), old = olderLots(s, l), done = palOf(s, l.id);
+    $("qaCode").textContent = s.c + "-" + l.id + (hand ? "（手 — QR なし）" : "");
+    $("qaT").textContent = inTxt(l.nyukoDate) + l.name;
+    $("qaNeed").innerHTML = "<small>" + (done.length ? "あと" : "取る 数") + "</small><b>" + left + "</b><span>" + esc(u) + "</span>" + (done.length ? "<em>（伝票 " + esc(l.qty) + "）</em>" : "");
+    $("qaS").textContent = (l.loc || "場所なし") + "・" + (s.tantou || s.hikitori || "") +
+      (old.length ? " — ⚠ もっと 古い ロット " + old[0].number + "（" + inDay(old[0].nyukoDate) + "・" + (old[0].location || "場所なし") + "）が あります" : "");
+    $("qaDone").innerHTML = done.map(function (p, i) { return "<div>パレット " + (i + 1) + "：" + esc(palTxt(p)) + "</div>"; }).join("");
+    $("qaP").textContent = "パレット " + (done.length + 1);
+    $("qaKeys").innerHTML = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "次 ›", "0", "⌫"].map(function (k) {
+      return '<button type="button" data-k="' + k + '"' + (k.length > 1 || k === "⌫" ? ' class="fn"' : "") + ">" + k + "</button>"; }).join("");
+    $("qtyAsk").classList.remove("hidden");
+    drawQty();
+  }
+  function qtyTotal() {
+    var v = qa.v, n = function (x) { return parseInt(x, 10) || 0; };
+    return qa.dan ? n(v.d) * n(v.p) + n(v.b) : n(v.n);
+  }
+  function drawQty() {
+    var v = qa.v, s = slipByKey(qa.key), u = s ? unitOf(s.c, qa.id) : "", t = qtyTotal(), left = qa.left;
+    var bx = function (k, lb) { return '<button type="button" class="bx' + (qa.f === k ? " on" : "") + '" data-f="' + k + '"><small>' + lb + "</small><b>" + esc(v[k]) + "</b></button>"; };
+    $("qaMode").textContent = qa.dan ? "数だけ 入れる" : "段で 数える";
+    $("qaF").innerHTML = qa.dan ? bx("d", "段") + '<span class="op">×</span>' + bx("p", "1段の 数") + '<span class="op">＋</span>' + bx("b", "バラ")
+                                : bx("n", "数（" + esc(u || "個") + "）");
+    $("qaKeys").querySelector('[data-k="次 ›"]').style.visibility = qa.dan ? "" : "hidden";
+    var r = $("qaR"), go = $("qaGo");
+    if (!t) { r.className = "qa-r"; r.textContent = "数えて 入れて ください"; }
+    else if (t === left) { r.className = "qa-r ok"; r.textContent = "＝ " + t + " " + u + "　✓ ぴったり"; }
+    else if (t < left) { r.className = "qa-r less"; r.textContent = "＝ " + t + " " + u + "　あと " + (left - t) + " — 次の パレットへ"; }
+    else { r.className = "qa-r over"; r.textContent = "＝ " + t + " " + u + "　✕ " + (t - left) + " 多い"; }
+    go.disabled = !t || t > left;
+    go.textContent = t && t < left ? "記録して 次の パレット" : "✓ 記録";
+  }
+  $("qaF").addEventListener("click", function (e) { var b = e.target.closest("[data-f]"); if (b && qa) { qa.f = b.getAttribute("data-f"); drawQty(); } });
+  $("qaMode").addEventListener("click", function () { if (!qa) return; qa.dan = !qa.dan; qa.v = { d: "", p: "", b: "", n: "" }; qa.f = qa.dan ? "d" : "n"; drawQty(); });
+  $("qaKeys").addEventListener("click", function (e) {
+    var b = e.target.closest("[data-k]"); if (!b || !qa) return;
+    var k = b.getAttribute("data-k"), v = qa.v, f = qa.f;
+    if (k === "⌫") v[f] = v[f].slice(0, -1);
+    else if (k.length > 1) { if (qa.dan) qa.f = f === "d" ? "p" : f === "p" ? "b" : "d"; }
+    else if (v[f].length < 4 && !(k === "0" && !v[f])) v[f] += k;
+    drawQty();
+  });
+  $("qaNo").addEventListener("click", function () { qa = null; $("qtyAsk").classList.add("hidden"); focusScan(); });
+  $("qaGo").addEventListener("click", function () {
+    if (!qa) return;
+    var s = slipByKey(qa.key), t = qtyTotal(), q = qa, n = function (x) { return parseInt(x, 10) || 0; };
+    $("qtyAsk").classList.add("hidden"); qa = null;
+    var l = s && s.lines.filter(function (x) { return x.id === q.id; })[0];
+    if (!s || !l || shipped(s) || slipLines(s)[q.id] || !t || t > q.left) { renderPick(); focusScan(); return; }
+    var k = palKey(s, q.id), list = pal[k] || (pal[k] = []);
+    list.push(q.dan ? { d: n(q.v.d), p: n(q.v.p), b: n(q.v.b), n: t } : { n: t });
+    lsSet(PAL_KEY, JSON.stringify(pal));
+    var u = unitOf(s.c, q.id), code = s.c + "-" + q.id;
+    if (t === q.left) {
+      queuePick(s, q.id, true, q.hand); beep(true);
+      pickMsg("ok", code, "✓ " + popLines(l.nyukoDate, l.name, l.qty + " " + u + (q.hand ? "（手）" : "")), q.id);
+    } else {
+      tone(660, 0, 0.12);
+      pickMsg("ok", code, "パレット " + list.length + " 記録\n" + popLines(l.nyukoDate, l.name, "あと " + (q.left - t) + " " + u) + " — 次の パレットを スキャン", q.id);
+    }
+    renderPick(); focusScan();
+  });
+
+  // ══ 同じ 列（棚）・きょうの 合計・手チェック（2026-11-12）══
+  //   列 = 5・6・7 は 部屋＋文字（7A・5R'）、8 は 2けた（81〜87）
+  var HAND_CONFIRM = true;   // QR なし の 手チェックで「目で 確かめましたか？」を 出す。要らなく なったら false（前の 確認だけに 戻る）
+  function rowsOf(loc) {
+    var t = normalize(String(loc || "")).toUpperCase().replace(/[’′‘`]/g, "'"), out = [], m, re = /(8[1-7])|([567])\s*([A-Z])\s*('?)/g;
+    while ((m = re.exec(t))) { var k = m[1] || (m[2] + m[3] + m[4]); if (out.indexOf(k) < 0) out.push(k); }
+    return out;
+  }
+  // その 列で まだ ✓ して いない 行（きょうの 伝票 ぜんぶ・出庫済みは 除く）
+  function rowTodo(row) {
+    var out = [];
+    (pk.slips || []).forEach(function (x) {
+      if (shipped(x)) return;
+      var m = slipLines(x);
+      x.lines.forEach(function (l) { if (!m[l.id] && rowsOf(l.loc).indexOf(row) >= 0) out.push({ s: x, l: l }); });
+    });
+    return out;
+  }
+  function rowStrips(s) {
+    var rows = [];
+    s.lines.forEach(function (l) { rowsOf(l.loc).forEach(function (r) { if (rows.indexOf(r) < 0) rows.push(r); }); });
+    return rows.sort(function (a, b) { return locKey(a) < locKey(b) ? -1 : 1; }).map(function (r) {
+      var n = rowTodo(r).filter(function (o) { return o.s.key !== s.key && o.s.c === s.c; }).length;   // 同じ 得意先 だけ（2026-11-13）
+      return n ? '<button type="button" class="row-strip" data-row="' + esc(r) + '">📍 ' + esc(r) + " で ほかの 伝票に まだ " + n + " 件<span>見る ›</span></button>" : "";
+    }).join("");
+  }
+  function openRowList(row) {
+    var s = pk.open && slipByKey(pk.open), list = rowTodo(row).filter(function (o) { return !s || o.s.c === s.c; });
+    $("rowListT").textContent = "📍 " + row + " — まだ 取って いない もの";
+    $("rowListL").innerHTML = list.length ? list.map(function (o) {
+      var here = s && o.s.key === s.key;
+      return '<div class="rl-it' + (here ? " here" : "") + '"><div class="rl-top"><b>' + esc(inTxt(o.l.nyukoDate) + o.l.name) + "</b><span>" + esc(o.l.qty) + " " + esc(unitOf(o.s.c, o.l.id)) + "</span></div>" +
+        '<div class="rl-who">' + (here ? "この 伝票 — " : esc(o.s.time || "—") + " ") + esc(o.s.client) + (o.s.tantou ? "・" + esc(o.s.tantou) : "") + "・" + esc(o.l.loc || "") + "</div></div>";
+    }).join("") : '<div class="hint">ありません</div>';
+    $("rowList").classList.remove("hidden");
+  }
+  $("rowListX").addEventListener("click", function () { $("rowList").classList.add("hidden"); focusScan(); });
+  // ✓ の あとに 出す もの — きょうの 合計（同じ 商品名が ほかの 伝票にも ある 時）・同じ 列で ほかに 取る もの
+  function pickExtra(s, l) {
+    var nm = normName(l.name), parts = [], tot = 0, html = "";
+    (pk.slips || []).forEach(function (x) {
+      if (x.key !== s.key && shipped(x)) return;
+      x.lines.forEach(function (y) { if (normName(y.name) === nm) { tot += parseFloat(y.qty) || 0; parts.push({ who: x.tantou || x.client, q: y.qty, d: inDay(y.nyukoDate) }); } });
+    });
+    if (parts.length > 1) html += '<div class="px sum"><div class="px-h">きょう この 商品の 合計</div><b>' + esc(tot) + "</b> " + esc(unitOf(s.c, l.id)) + " ＝ " +
+      parts.map(function (p) { return esc(p.who) + " " + esc(p.q) + (p.d ? '<span class="px-d">（' + esc(p.d) + "）</span>" : ""); }).join(" ＋ ") + "</div>";
+    var rows = rowsOf(l.loc), seen = {}, other = [];
+    rows.forEach(function (r) { rowTodo(r).forEach(function (o) { var k = o.s.key + "|" + o.l.id; if (seen[k] || (o.s.key === s.key && o.l.id === l.id)) return; seen[k] = 1; other.push(o); }); });
+    if (other.length) html += '<div class="px same"><div class="px-h">📍 ' + esc(rows.join("・")) + " で ほかに 取る もの</div>" + other.slice(0, 6).map(function (o) {
+      return esc(inTxt(o.l.nyukoDate) + o.l.name) + " <b>" + esc(o.l.qty) + "</b> → " + (o.s.key === s.key ? "この 伝票" : esc(o.s.tantou || o.s.client));
+    }).join("<br>") + (other.length > 6 ? "<br>… ほか " + (other.length - 6) + " 件" : "") + "</div>";
+    return html;
+  }
+  // QR なし — 目で 確かめて ✓（手）
+  function askHand(s, id) {
+    var l = s.lines.filter(function (x) { return x.id === id; })[0]; if (!l) return;
+    $("handT").textContent = inTxt(l.nyukoDate) + l.name + " × " + l.qty + " " + unitOf(s.c, id);
+    $("handS").textContent = id + "・" + (l.loc || "場所なし") + " — QR が ありません。商品と 数を 目で 確かめましたか？";
+    $("handAsk").dataset.key = s.key; $("handAsk").dataset.id = id;
+    $("handAsk").classList.remove("hidden");
+  }
+  $("handNo").addEventListener("click", function () { $("handAsk").classList.add("hidden"); focusScan(); });
+  $("handYes").addEventListener("click", function () {
+    var d = $("handAsk").dataset, s = slipByKey(d.key);
+    $("handAsk").classList.add("hidden");
+    if (!s || shipped(s) || slipLines(s)[d.id]) { renderPick(); focusScan(); return; }
+    var l = s.lines.filter(function (x) { return x.id === d.id; })[0];
+    queuePick(s, d.id, true, true); beep(true);
+    pickMsg("ok", s.c + "-" + d.id, "✓ " + popLines(l.nyukoDate, l.name, l.qty + " " + unitOf(s.c, d.id) + "（手）"), d.id);
+    renderPick(); focusScan();
+  });
+
+  $("pickView").addEventListener("click", function (e) {
+    var b = e.target.closest("[data-pk], [data-slip], [data-line], [data-row]"); if (!b) return;
+    var a = b.getAttribute("data-pk"), s = pk.open && slipByKey(pk.open);
+    if (b.hasAttribute("data-row")) { openRowList(b.getAttribute("data-row")); return; }
+    if (b.hasAttribute("data-slip")) { openSlip(b.getAttribute("data-slip")); renderPick(); window.scrollTo(0, 0); }
+    else if (a === "prev" || a === "next") { pk.date = dayShift(pk.date, a === "prev" ? -1 : 1); pk.open = ""; pk.msg = null; loadSlips(); }
+    else if (a === "reload") { pk.msg = null; loadSlips(); }
+    else if (a === "close") { pk.open = ""; pk.msg = null; renderPick(); window.scrollTo(0, 0); }
+    else if (a === "ship" && s && slipCount(s) === s.lines.length) {
+      $("shipS").textContent = s.client + " · " + (s.time || "") + " · " + s.lines.length + " 行";
+      $("shipL").innerHTML = s.lines.map(function (l) { return "<div><span>" + esc(l.id + " " + l.name) + "</span><b>" + esc(l.qty + " " + unitOf(s.c, l.id)) + "</b></div>"; }).join("");
+      $("shipAsk").dataset.key = s.key; $("shipAsk").classList.remove("hidden"); return;
+    }
+    else if (a === "unship" && s) {
+      if (!confirm("出庫 確定を 取り消しますか？（積み込み待ちに 戻ります）")) return;
+      queuePick(s, "🚚", false, true); pk.msg = null; renderPick();
+    }
+    else if (b.hasAttribute("data-line") && s && shipped(s)) { pickMsg("warn", "", "出庫済みです — 直す 時は 先に「確定を 取り消す」"); renderPick(); }
+    else if (a === "reset" && s) {
+      var on = slipLines(s);
+      if (!Object.keys(on).length || !confirm("この 伝票の チェックを 全部 消して やり直しますか？（ほかの スマホ・PC からも 消えます）")) return;
+      Object.keys(on).forEach(function (id) { queuePick(s, id, false, true); });
+      s.lines.forEach(function (x) { palClear(s, x.id); });
+      pk.msg = null; renderPick();
+    } else if (b.hasAttribute("data-line") && s) {   // ラベルが 読めない 時は 手で
+      var id = b.getAttribute("data-line"), d = slipLines(s)[id];
+      var hl = s.lines.filter(function (x) { return x.id === id; })[0];
+      if (d) { if (!confirm(id + " の チェックを 外しますか？")) return; queuePick(s, id, false, true); palClear(s, id); }
+      else if (QTY_CONFIRM && hl && needOf(hl) > 0) { openQty(s, hl, true); return; }
+      else if (HAND_CONFIRM) { askHand(s, id); return; }
+      else { if (!confirm(id + " を 手で チェック しますか？（ラベルが 読めない 時だけ）")) return; queuePick(s, id, true, true); }
+      pk.msg = null; renderPick();
+    }
+    focusScan();
+  });
+  // どの 伝票ですか？ — 時刻・得意先・引取先・運送・担当者・この 品番の 数 を 見て 選ぶ
+  var askGroups = [];
+  function askSlip(c, id, list, only) {
+    var first = list[0].lines.filter(function (l) { return l.id === id; })[0] || {};
+    $("slipAskS").textContent = c + "-" + id + "　" + (first.name || "") + " — " + list.length + " 枚の 伝票に あります";
+    var groups = [], gi = {};
+    list.forEach(function (x) { var g = (x.tantou || "") + "|" + (x.hikitori || ""); if (gi[g] == null) { gi[g] = groups.length; groups.push([]); } groups[gi[g]].push(x); });
+    if (!only && groups.length > 1) {   // まず 担当者・引取先
+      $("slipAskT").textContent = "だれの 分ですか？";
+      $("slipAskL").innerHTML = groups.map(function (g, i) {
+        var x = g[0], tot = 0; g.forEach(function (y) { var l = y.lines.filter(function (q) { return q.id === id; })[0]; tot += l ? parseFloat(l.qty) || 0 : 0; });
+        var row = function (k, v) { return '<div class="sp-row"><span>' + k + "</span><b>" + esc(v || "—") + "</b></div>"; };
+        return '<button type="button" ' + (g.length === 1 ? 'data-key="' + esc(x.key) + '"' : 'data-g="' + i + '"') + ">" +
+          '<div class="sp-top"><span>' + esc(x.tantou || "—") + '</span><span class="sp-qty">' + esc(tot) + " " + esc(unitOf(c, id)) + "</span></div>" +
+          row("引取先", x.hikitori) + (g.length > 1 ? '<div class="sp-n">伝票 ' + g.length + " 枚 — 次で 選ぶ</div>" : '<div class="sp-n">' + esc(x.time || "") + " " + esc(x.unso || "") + "</div>") + "</button>";
+      }).join("");
+      askGroups = groups;
+      $("slipAsk").dataset.c = c; $("slipAsk").dataset.id = id;
+      $("slipAsk").classList.remove("hidden");
+      tone(660, 0, 0.14);
+      return;
+    }
+    $("slipAskT").textContent = "どの 伝票ですか？";
+    $("slipAskL").innerHTML = list.map(function (x) {
+      var l = x.lines.filter(function (q) { return q.id === id; })[0] || {}, n = slipCount(x);
+      var row = function (k, v) { return '<div class="sp-row"><span>' + k + "</span><b>" + esc(v || "—") + "</b></div>"; };
+      return '<button type="button" data-key="' + esc(x.key) + '">' +
+        '<div class="sp-top"><span>' + esc(x.time || "—") + "</span><span>" + esc(x.client) + '</span><span class="sp-qty">' + esc(l.qty == null ? "" : l.qty) + " " + esc(unitOf(c, id)) + "</span></div>" +
+        row("入庫日", inDay(l.nyukoDate)) + row("引取先", x.hikitori) + row("運送", x.unso) + row("担当者", x.tantou) +
+        '<div class="sp-prog">' + x.lines.length + " 行・チェック " + n + " / " + x.lines.length + "</div></button>";
+    }).join("");
+    $("slipAsk").dataset.c = c; $("slipAsk").dataset.id = id;
+    $("slipAsk").classList.remove("hidden");
+    tone(660, 0, 0.14);
+  }
+  function closeSlipAsk() { $("slipAsk").classList.add("hidden"); }
+  $("slipAskNo").addEventListener("click", function () { closeSlipAsk(); focusScan(); });
+  $("slipAskL").addEventListener("click", function (e) {
+    var gb = e.target.closest("button[data-g]");
+    if (gb) { askSlip($("slipAsk").dataset.c, $("slipAsk").dataset.id, askGroups[+gb.getAttribute("data-g")] || [], true); return; }
+    var b = e.target.closest("button[data-key]"); if (!b) return;
+    var c = $("slipAsk").dataset.c, id = $("slipAsk").dataset.id;
+    closeSlipAsk();
+    pickScan(c, id, b.getAttribute("data-key"));
+    focusScan();
+  });
+  $("shipNo").addEventListener("click", function () { $("shipAsk").classList.add("hidden"); focusScan(); });
+  $("shipGo").addEventListener("click", function () {
+    var s = slipByKey($("shipAsk").dataset.key || ""); $("shipAsk").classList.add("hidden");
+    if (s && !shipped(s)) {   // 確定したら 伝票の 一覧へ 戻る（次の 伝票へ・2026-11-12）
+      queuePick(s, "🚚", true, true); pk.open = ""; beep(true);
+      pickMsg("ok", "", "🚚 出庫 確定 — " + s.client + " " + (s.time || ""));
+      renderPick(); window.scrollTo(0, 0);
+    }
+    focusScan();
+  });
+  function setState(text, cls) { var el = $("cardState"); if (el) { el.textContent = text; el.className = "state " + (cls || ""); } }
+  function flash() { var c = $("card"); c.classList.remove("flash"); void c.offsetWidth; c.classList.add("flash"); }
+
+  function showItem(c, id, keepTab) {
+    var my = ++seq, t0 = Date.now();
+    if (!keepTab) tab = "info";
+    loadKiroku(c, id);
+    $("scanErr").textContent = "";
+    var changedClient = !!cur && cur !== c;
+    if (cur !== c) { cur = c; lsSet(K.c, JSON.stringify({ number: c })); }
+    useClient(c, false);
+    renderHeader();
+    var cached = lists[c].items[id];
+    if (cached) {
+      renderItem(c, id, cached, "確認中…", "", changedClient); flash(); beep(true);
+      addRecent(c, id, cached);
+    } else {
+      renderMsgCard(c, id, '<div class="hint">読み込み中…</div>', false, changedClient);
+      flash();
+    }
+    apiGet({ api: "item", client: c, id: id }).then(function (j) {
+      if (j.item) lists[c].items[id] = j.item; else delete lists[c].items[id];
+      if (my !== seq) return;
+      var secs = ((Date.now() - t0) / 1000).toFixed(1) + " 秒";
+      if (!j.item) {
+        renderMsgCard(c, id, '<div style="margin-top:6px">' + esc(clientLabel(c)) + " に この 品番は ありません。</div>", true);
+        if (cached) removeRecent(c, id);
+        beep(false); return;
+      }
+      var changed = cached && (String(cached.stock) !== String(j.item.stock) || cached.location !== j.item.location || Number(cached.yoyakuQty) !== Number(j.item.yoyakuQty));
+      if (cached && !changed) { setState("✓ 最新", "ok"); }
+      else { renderItem(c, id, j.item, changed ? "⚠ 数が 変わりました（最新）" : "✓ " + secs, changed ? "upd" : "ok", changedClient); if (!cached) { flash(); beep(true); } }
+      addRecent(c, id, j.item);
+    }).catch(function (e) {
+      if (my !== seq || e.auth) return;
+      if (cached) setState("最新を 確かめられません（先読みの 数）", "upd");
+      else {
+        renderMsgCard(c, id, '<div style="margin-top:6px">読めませんでした: ' + esc(e.message) +
+          '</div><button type="button" id="retryBtn" style="width:100%;margin-top:10px">もう一度</button>', true);
+        $("retryBtn").addEventListener("click", function () { showItem(c, id, true); focusScan(); });
+        beep(false);
+      }
+    });
+  }
+
+  function addRecent(c, id, it) {
+    recent = recent.filter(function (r) { return !(r.c === c && r.id === id); });
+    recent.unshift({ c: c, id: id, t: Date.now(), loc: it.location || "", stock: realStock(it) });
+    recent = recent.slice(0, 8);
+    renderRecent();
+  }
+  function removeRecent(c, id) { recent = recent.filter(function (r) { return !(r.c === c && r.id === id); }); renderRecent(); }
+  function renderRecent() {
+    $("recentH").textContent = recent.length ? "さっき スキャンした もの" : "";
+    $("recent").innerHTML = recent.map(function (r) {
+      return '<div class="rec" data-c="' + esc(r.c) + '" data-id="' + esc(r.id) + '"><span class="t">' + hhmm(r.t) + '</span><span class="n">' + esc(r.c + "-" + r.id) +
+        '</span><span>' + esc(r.loc || "—") + '</span><span class="s' + (r.stock <= 0 ? " zero" : "") + '">' + r.stock + "</span></div>";
+    }).join("");
+  }
+  $("recent").addEventListener("click", function (e) {
+    var r = e.target.closest(".rec"); if (!r) return;
+    showItem(r.getAttribute("data-c"), r.getAttribute("data-id")); focusScan();
+  });
+
+  // ── 場所の 変更（この 画面で）— LocPad で 入れる → 確かめる → サーバーへ（api=loc）。電波が 無い 時は 変えられない ──
+  function openLocEdit(c, id) {
+    var it = (lists[c] && lists[c].items[id]) || cardItem;
+    if (!it || !window.LocPad) return;
+    var cur = String(it.location || "");
+    LocPad.open({
+      title: c + "-" + id, sub: it.name || "", value: cur, okText: "決定",
+      onClose: function () { setTimeout(focusScan, 50); },
+      onOk: function (v) {
+        v = String(v == null ? "" : v).trim();
+        if (!v) { alert("場所を 入れて ください"); return; }
+        if (v === cur) { LocPad.close(); focusScan(); return; }
+        if (!confirm(c + "-" + id + " の 場所を 変えますか？\n\n" + (cur || "（なし）") + "\n   ↓\n" + v)) return;
+        LocPad.close();
+        setState("場所を 保存中…", "wait");
+        showBusy("場所を 保存中…");
+        apiPost({ api: "loc", client: c, id: id, loc: v }).then(function (j) {
+          hideBusy();
+          var nv = String(j.newLocation == null ? v : j.newLocation);
+          it.location = nv;
+          var L = lists[c];
+          if (L && L.items && L.items[id]) {
+            L.items[id].location = nv;
+            lsSet(K.list + c, JSON.stringify({ at: L.at || Date.now(), items: Object.keys(L.items).map(function (k) { return L.items[k]; }) }));
+          }
+          delete kiroku[c + "-" + id];   // 場所の 記録を 読み直す
+          beep(true);
+          showItem(c, id, true);
+          showPop("ok", c + "-" + id, "✓ 場所を 変えました — " + nv);
+        }).catch(function (e) {
+          hideBusy();
+          if (e && e.auth) return;
+          beep(false); setState("場所を 変えられませんでした", "err");
+          alert("場所を 変えられませんでした: " + ((e && e.message) || e) + "\n（電波を 確かめて もう一度）");
+          focusScan();
+        });
+      }
+    });
+  }
+  // ── 🏷 ラベル印刷（この 画面で・2026-11-12）— A4 横・1枚・大きさは 自動。得意先 27 だけ 通常 / いりこ用 ──
+  //   ラベルは 277mm × 190mm（1047 × 718 px）で 作って、画面では 小さく 見せる。印刷も 同じ もの。
+  var QR_SRC = "https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js";
+  var QR_SRI = "sha384-3zSEDfvllQohrq0PHL1fOXJuC/jSOO34H46t6UQfobFOmxE5BpjjaIJY5F2/bMnU";
+  var LBL_W = 1047, LBL_H = 718, qrLoading = null, lblStyle = "normal", lblSeq = 0, lblCode = "", lblFile = null;
+  function loadQR() {
+    if (window.QRCode) return Promise.resolve();
+    if (qrLoading) return qrLoading;
+    qrLoading = new Promise(function (res, rej) {
+      var sc = document.createElement("script");
+      sc.src = QR_SRC; sc.integrity = QR_SRI; sc.crossOrigin = "anonymous";
+      sc.onload = function () { res(); }; sc.onerror = function () { qrLoading = null; rej(new Error("QR の 部品を 読めませんでした")); };
+      document.head.appendChild(sc);
+    });
+    return qrLoading;
+  }
+  function qrData(text) {
+    var d = document.createElement("div");
+    new QRCode(d, { text: text, width: 256, height: 256, correctLevel: QRCode.CorrectLevel.M });
+    var cv = d.querySelector("canvas"), im = d.querySelector("img");
+    return cv ? cv.toDataURL("image/png") : (im ? im.src : "");
+  }
+  function labelPaneHtml(c) {
+    return '<div class="pane' + (tab === "label" ? " active" : "") + '" data-pane="label"><div class="sec-head">ラベル印刷（A4 横・1枚）</div>' +
+      (String(c) === "27" ? '<div class="lbl-style" id="lblStyle"><button type="button" data-lst="normal">通常</button><button type="button" data-lst="iriko">⚠ いりこ用</button></div>' : "") +
+      '<div class="lbl-wrap" id="lblWrap"><div class="empty-msg">ラベルを 作って います…</div></div>' +
+      '<button type="button" class="primary lbl-go" id="lblPrint" disabled>🖨 ラベル印刷</button>' +
+      (canShareFiles() ? '<div class="lbl-hint">共有 → 「プリント」→ プリンター・Canon を 選ぶ（A4 横・1枚）</div>' : "") + "</div>";
+  }
+  function labelHtml(c, id, it, qr) {
+    c = String(c);
+    var iriko = c === "27" && lblStyle === "iriko", nag = c === "55", name = String(it.name || "");
+    var cl = clientByNumber(c);
+    var top = iriko ? "扇" + id : nag ? name.slice(0, 5) : (cl ? (cl.label || cl.name) : "得意先 " + c);
+    var prod = nag ? name.slice(5).replace(/^\s+/, "") : name;
+    var dm = String(it.nyukoDate || "").match(/^(\d{4})\D+(\d{1,2})\D+(\d{1,2})/);
+    var dy = dm ? "'" + dm[1].slice(2) : "", md = dm ? (+dm[2]) + "/" + (+dm[3]) : String(it.nyukoDate || "");
+    var q0 = String(it.nyukoQty == null ? "" : it.nyukoQty).replace(/口/g, ""), qm = q0.match(/^(\d+\.?\d*)/), num = qm ? qm[1] : q0;
+    var q = '<div class="lq"><img src="' + qr + '" alt=""></div>';
+    var date = '<div class="ldt">入庫 <span class="ly">' + esc(dy) + '</span></div><div class="lbig">' + esc(md) + "</div>";
+    var qty = '<span class="lnum">' + esc(num) + '</span><span class="lunit">ヶ</span>';
+    var lines = prod.split("\n").filter(function (l) { return l.length; }).map(function (l) { return esc(l).replace(/ /g, "&nbsp; "); }).join("<br>");
+    var topH = (nag || iriko)
+      ? '<div class="lt" style="flex:0 0 40.6%"><div class="lcw"><div class="lc">' + esc(top) + "</div></div></div>"
+      : '<div class="lt"><div class="lcw"><div class="lc">' + esc(top) + "</div></div>" + q + "</div>";
+    var botH = iriko
+      ? '<div class="lb"><div>' + date + '</div><div style="display:flex;align-items:flex-end;gap:27px"><div style="line-height:.85">' + qty + "</div>" + q + "</div></div>"
+      : nag
+      ? '<div class="lbn">' + date + '<div style="display:flex;justify-content:flex-end">' + q + "</div></div>"
+      : '<div class="lb"><div>' + date + '</div><div style="line-height:.85">' + qty + "</div></div>";
+    return topH + '<div class="lr"></div><div class="lpr"><div class="lp">' + lines + '</div></div><div class="lr"></div>' + botH;
+  }
+  function fitText(el, w, h) {
+    var lo = 10, hi = 500, best = 10;
+    while (lo <= hi) {
+      var mid = (lo + hi) >> 1;
+      el.style.fontSize = mid + "px";
+      if (el.scrollWidth <= w && el.scrollHeight <= h) { best = mid; lo = mid + 1; } else hi = mid - 1;
+    }
+    el.style.fontSize = best + "px";
+    return best;
+  }
+  function fitLabel(c) {
+    var pg = $("lblPage"); if (!pg) return;
+    var lc = pg.querySelector(".lc"), lcw = pg.querySelector(".lcw"), lp = pg.querySelector(".lp"), lpr = pg.querySelector(".lpr");
+    if (lc && lcw) { var b = fitText(lc, lcw.clientWidth, lcw.clientHeight); if (String(c) === "55") lc.style.fontSize = Math.round(b * 1.2) + "px"; }
+    if (lp && lpr) fitText(lp, lpr.clientWidth, lpr.clientHeight);
+  }
+  function scaleLabel() {
+    var wrap = $("lblWrap"), pg = $("lblPage"); if (!wrap || !pg || !wrap.clientWidth) return;
+    var k = wrap.clientWidth / LBL_W;
+    pg.style.transform = "scale(" + k + ")";
+    wrap.style.height = Math.ceil(LBL_H * k) + "px";
+  }
+  function syncLblStyle() {
+    var box = $("lblStyle"); if (!box) return;
+    Array.prototype.forEach.call(box.querySelectorAll("button"), function (b) { b.classList.toggle("active", b.getAttribute("data-lst") === lblStyle); });
+  }
+  function drawLabel(c, id, it) {
+    var wrap = $("lblWrap"); if (!wrap || !it) return;
+    var seq = ++lblSeq, live = function () { return seq === lblSeq && document.body.contains(wrap); };
+    if (c + "-" + id !== lblCode) { lblCode = c + "-" + id; lblStyle = "normal"; }   // 別の 商品は 通常から
+    syncLblStyle();
+    if ($("lblPrint")) $("lblPrint").disabled = true;
+    lblFile = null;
+    loadQR().then(function () {
+      if (!live()) return;
+      wrap.innerHTML = '<div class="lbl-page" id="lblPage">' + labelHtml(c, id, it, qrData(c + "-" + id)) + "</div>";
+      fitLabel(c); scaleLabel();
+      if (!canShareFiles() && !PDF_PRINT && $("lblPrint")) $("lblPrint").disabled = false;
+      var done = function () {
+        if (!live()) return;
+        fitLabel(c); scaleLabel();
+        if (!canShareFiles() && !PDF_PRINT) return;
+        labelPdf(c + "-" + id).then(function (file) {
+          if (!live()) return;
+          lblFile = file;
+          return (PDF_PRINT ? loadPdfFrame(file) : null);
+        }).then(function () { if (live() && $("lblPrint")) $("lblPrint").disabled = false; })
+          .catch(function () { if (live() && $("lblPrint")) $("lblPrint").disabled = false; });   // PDF が 作れない 時は 今までの 印刷
+      };
+      if (document.fonts && document.fonts.ready) document.fonts.ready.then(done); else done();
+    }).catch(function (e) {
+      if (live()) wrap.innerHTML = '<div class="empty-msg">ラベルを 作れませんでした — 電波を 確かめて、もう一度 タブを 押して ください（' + esc((e && e.message) || e) + "）</div>";
+    });
+  }
+  // ── PDF（A4 横・1枚）— 画面の ラベルを そのまま 絵に して 入れる。共有 → Canon PRINT など ──
+  var USE_SHARE = true;   // 共有 → プリント（PDF は A4 横・フッター なし）。12f・12g の 印刷は iPhone で 縦・フッター付き
+  // iPhone / iPad: ラベルの PDF（A4 横）を 見えない 枠に 読み込んで おき、🖨 で その PDF を 印刷（試し・2026-11-12g）
+  var PDF_PRINT = false;   // 12g の 試し — iPhone では 効かなかった
+  var lblFrameUrl = "";
+  function loadPdfFrame(file) {
+    var fr = $("lblFrame");
+    if (!fr) { fr = document.createElement("iframe"); fr.id = "lblFrame"; fr.setAttribute("aria-hidden", "true"); fr.tabIndex = -1;
+      fr.style.cssText = "position:fixed;left:0;top:0;width:2px;height:2px;opacity:0;border:0;pointer-events:none;"; document.body.appendChild(fr); }
+    if (lblFrameUrl) { try { URL.revokeObjectURL(lblFrameUrl); } catch (e) {} }
+    fr.dataset.ok = "";
+    return new Promise(function (res) {
+      fr.onload = function () { fr.dataset.ok = "1"; res(); };
+      setTimeout(res, 3000);
+      lblFrameUrl = URL.createObjectURL(file); fr.src = lblFrameUrl;
+    });
+  }
+  function canShareFiles() {
+    if (!USE_SHARE) return false;
+    try { return !!(navigator.share && navigator.canShare && window.File && navigator.canShare({ files: [new File(["x"], "t.pdf", { type: "application/pdf" })] })); } catch (e) { return false; }
+  }
+  function labelCanvas() {
+    var pg = $("lblPage"), pr = pg.getBoundingClientRect(), k = pr.width / LBL_W, S = 3;
+    var cv = document.createElement("canvas"); cv.width = LBL_W * S; cv.height = LBL_H * S;
+    var x = cv.getContext("2d");
+    x.fillStyle = "#fff"; x.fillRect(0, 0, cv.width, cv.height);
+    x.setTransform(S / k, 0, 0, S / k, -pr.left * S / k, -pr.top * S / k);   // 画面の 位置で 描く
+    Array.prototype.forEach.call(pg.querySelectorAll(".lr"), function (e) { var q = e.getBoundingClientRect(); x.fillStyle = "#000"; x.fillRect(q.left, q.top, q.width, q.height); });
+    x.imageSmoothingEnabled = false;
+    Array.prototype.forEach.call(pg.querySelectorAll(".lq img"), function (e) { var q = e.getBoundingClientRect(); x.drawImage(e, q.left, q.top, q.width, q.height); });
+    var tw = document.createTreeWalker(pg, NodeFilter.SHOW_TEXT, null), node, rg = document.createRange();
+    while ((node = tw.nextNode())) {
+      var cs = getComputedStyle(node.parentNode), t = node.nodeValue;
+      x.font = cs.fontWeight + " " + (parseFloat(cs.fontSize) * k) + "px " + cs.fontFamily;
+      x.fillStyle = cs.color; x.textBaseline = "alphabetic";
+      for (var i = 0; i < t.length; i++) {
+        var n = (t.charCodeAt(i) >= 0xD800 && t.charCodeAt(i) < 0xDC00) ? 2 : 1, ch = t.substr(i, n);
+        if (!/\S/.test(ch.replace(/\u00a0/g, " "))) { i += n - 1; continue; }
+        rg.setStart(node, i); rg.setEnd(node, i + n);
+        var q = rg.getClientRects()[0]; i += n - 1;
+        if (!q || !q.width) continue;
+        var m = x.measureText(ch), asc = m.fontBoundingBoxAscent, dsc = m.fontBoundingBoxDescent;
+        var base = (asc != null && dsc != null) ? q.top + (q.height - asc - dsc) / 2 + asc : q.top + q.height * 0.86;
+        x.fillText(ch, q.left, base);
+      }
+    }
+    return cv;
+  }
+  // JPEG 1枚を A4 横（842 × 595pt）の 真ん中に 277 × 190mm で 置いた PDF
+  function jpegPdf(jpg, w, h) {
+    var enc = function (str) { var a = new Uint8Array(str.length); for (var i = 0; i < str.length; i++) a[i] = str.charCodeAt(i) & 255; return a; };
+    var parts = [], len = 0, offs = [];
+    var add = function (p) { if (typeof p === "string") p = enc(p); parts.push(p); len += p.length; };
+    var obj = function (n, body, stream) { offs[n] = len; add(n + " 0 obj\n" + body); if (stream) { add("stream\n"); add(stream); add("\nendstream"); } add("\nendobj\n"); };
+    var cmd = "q 785.20 0 0 538.58 28.35 28.35 cm /Im0 Do Q";
+    add("%PDF-1.4\n");
+    obj(1, "<< /Type /Catalog /Pages 2 0 R >>");
+    obj(2, "<< /Type /Pages /Kids [3 0 R] /Count 1 >>");
+    obj(3, "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 841.89 595.28] /Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>");
+    obj(4, "<< /Type /XObject /Subtype /Image /Width " + w + " /Height " + h + " /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length " + jpg.length + " >>\n", jpg);
+    obj(5, "<< /Length " + cmd.length + " >>\n", enc(cmd));
+    var xref = len, x = "xref\n0 6\n0000000000 65535 f \n";
+    for (var i = 1; i <= 5; i++) x += ("0000000000" + offs[i]).slice(-10) + " 00000 n \n";
+    add(x + "trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n" + xref + "\n%%EOF\n");
+    return new Blob(parts, { type: "application/pdf" });
+  }
+  function labelPdf(code) {
+    return new Promise(function (res, rej) {
+      var cv = labelCanvas();
+      cv.toBlob(function (b) {
+        if (!b) return rej(new Error("画像を 作れませんでした"));
+        var fr = new FileReader();
+        fr.onload = function () {
+          var pdf = jpegPdf(new Uint8Array(fr.result), cv.width, cv.height);
+          res(new File([pdf], "label_" + code + ".pdf", { type: "application/pdf" }));
+        };
+        fr.onerror = function () { rej(fr.error); };
+        fr.readAsArrayBuffer(b);
+      }, "image/jpeg", 0.9);
+    });
+  }
+  function shareOrPrintLabel() {
+    var fr = $("lblFrame");
+    if (PDF_PRINT && lblFile && fr && fr.dataset.ok && fr.contentWindow) {
+      prepPrintImage();   // 念のため: iPhone が 画面の 方を 印刷した 時も ラベルだけ 出る
+      try { fr.contentWindow.focus(); fr.contentWindow.print(); return; } catch (e) {}
+      window.print(); return;
+    }
+    if (lblFile && canShareFiles()) {
+      navigator.share({ files: [lblFile] }).catch(function (e) {
+        if (e && e.name === "AbortError") return;   // やめた 時は 何も しない
+        printLabel();
+      });
+      return;
+    }
+    printLabel();
+  }
+  function prepPrintImage() {
+    var pg = $("lblPage"); if (!pg) return "";
+    var out = $("lblOut");
+    if (!out) { out = document.createElement("div"); out.id = "lblOut"; document.body.appendChild(out); }
+    var src = "";
+    try { src = labelCanvas().toDataURL("image/jpeg", 0.92); } catch (e) {}
+    out.innerHTML = src ? '<img class="lbl-img" alt="" src="' + src + '">' : pg.outerHTML.replace(' id="lblPage"', "");
+    document.body.classList.add("lbl-printing");
+    return src;
+  }
+  function printLabel() {
+    var pg = $("lblPage"); if (!pg) return;
+    var out = $("lblOut");
+    if (!out) { out = document.createElement("div"); out.id = "lblOut"; document.body.appendChild(out); }
+    var src = "";
+    try { src = labelCanvas().toDataURL("image/jpeg", 0.92); } catch (e) {}   // 画面の ラベルを 1枚の 絵に（紙に 合わせて 縮むので 1ページに 収まる）
+    document.body.classList.add("lbl-printing");
+    if (!src) { out.innerHTML = pg.outerHTML.replace(' id="lblPage"', ""); setTimeout(function () { window.print(); }, 60); return; }
+    out.innerHTML = '<img class="lbl-img" alt="" src="' + src + '">';
+    var im = out.firstChild, go = function () { window.print(); };
+    if (im.decode) im.decode().then(go, go); else setTimeout(go, 200);
+  }
+  // 印刷画面を 閉じた あと、画面に 触ったら 元に 戻す（afterprint は スマホで すぐ 来て、向きを 変えると 画面 全部が 出て しまう）
+  document.addEventListener("pointerdown", function () { document.body.classList.remove("lbl-printing"); }, true);
+  window.addEventListener("resize", scaleLabel);
+  function showBusy(t) { $("busyT").textContent = t || "保存中…"; $("busy").classList.remove("hidden"); }
+  function hideBusy() { $("busy").classList.add("hidden"); }
+
+  // ── カメラで 読む（jsQR は 使う 時だけ 読み込む）──
+  var JSQR_SRC = "https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js";
+  var JSQR_SRI = "sha384-b5Ya4Bq3qCyz39m2ISh+4DxjAIljdeFwK/BsXLuj9gugaNwAcj/ia15fxNZL9Nlx";
+  var camStream = null, camRaf = 0, jsqrLoading = null;
+  function loadJsQR() {
+    if (window.jsQR) return Promise.resolve();
+    if (jsqrLoading) return jsqrLoading;
+    jsqrLoading = new Promise(function (res, rej) {
+      var s = document.createElement("script");
+      s.src = JSQR_SRC; s.integrity = JSQR_SRI; s.crossOrigin = "anonymous";
+      s.onload = function () { res(); }; s.onerror = function () { jsqrLoading = null; rej(new Error("カメラ用の 部品を 読めませんでした")); };
+      document.head.appendChild(s);
+    });
+    return jsqrLoading;
+  }
+  // 📷 = 開く / 閉じる。開いている 間は 読むたびに 結果を 出して そのまま 次の ラベルを 待つ（連続）。
+  // 同じ ラベルは 2.5 秒 続けて 読まない（枠に 入った まま でも 1回だけ）。読んだ あと 0.8 秒 休む。
+  // カメラの 許可（版 2026-11-09e）: iPhone は カメラを 止めると 次に 開く 時 また 許可を 聞く。
+  //  ・閉じる → 隠して 読むのを やめる だけ。カメラは 1分 そのまま（止めない・休ませない）→ 1分 以内に 開けば 許可を 聞かない。
+  //  ・1分 たったら 本当に 止める（カメラの 印が 消える・電池を 使わない）。次に 開く 時は 許可を 聞く ことが ある。
+  //  ・開き直した カメラが 動かない（iPhone が 止めていた）時は 自動で 新しく 開き直す（1回だけ）。
+  var CAM_KEEP_MS = 60000;
+  var camOpening = false, camPauseUntil = 0, lastCode = "", lastCodeAt = 0, hitTimer = null, camWasOpen = false;
+  var camOffTimer = null, camWatchT = null, camRetried = false;
+  function camLive() {
+    var t = camStream && camStream.getVideoTracks()[0];
+    return !!(t && t.readyState === "live" && !t.muted);
+  }
+  function camShown() { return !$("cam").classList.contains("hidden"); }
+  $("camBtn").addEventListener("click", function () {
+    unlockAudio();
+    if (camShown()) { closeCam(); return; }
+    camRetried = false;
+    openCam();
+  });
+  function openCam() {
+    clearTimeout(camOffTimer);
+    $("cam").classList.remove("hidden"); $("camBtn").classList.add("on");
+    if (camLive()) { startCam(); return; }   // 1分 以内 — 同じ カメラ（許可を 聞かない）
+    if (camOpening) return;
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { closeCam(); $("scanErr").textContent = "この ブラウザでは カメラが 使えません"; return; }
+    camOpening = true; dropCam();
+    $("camMsg").textContent = "カメラを 開いています…";
+    Promise.all([loadJsQR(), navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false })])
+      .then(function (r) {
+        camOpening = false;
+        camStream = r[1];
+        if (camShown()) startCam(); else camOffTimer = setTimeout(dropCam, CAM_KEEP_MS);   // 開く 前に 閉じた
+      })
+      .catch(function (e) { camOpening = false; closeCam(); dropCam(); $("scanErr").textContent = "カメラを 使えません: " + (e && e.message ? e.message : e); });
+  }
+  function startCam() {
+    var v = $("camVideo");
+    if (v.srcObject !== camStream) v.srcObject = camStream;
+    var pr = v.play(); if (pr && pr.catch) pr.catch(function () {});
+    $("camMsg").textContent = "QR を 枠に 入れて ください（続けて 読めます）";
+    lastCode = ""; camPauseUntil = 0;
+    cancelAnimationFrame(camRaf); camLoop();
+    camWatch();
+  }
+  // 見張り: 2 秒で 映像が 来なければ カメラを 新しく 開き直す（1回だけ。だめなら ページを 開き直して もらう）
+  function camWatch() {
+    var v = $("camVideo"), got = v.requestVideoFrameCallback ? false : null;
+    if (got === false) v.requestVideoFrameCallback(function () { got = true; });
+    clearTimeout(camWatchT);
+    camWatchT = setTimeout(function () {
+      if (!camShown() || camOpening) return;
+      var t = camStream && camStream.getVideoTracks()[0];
+      var ok = t && t.readyState === "live" && !t.muted && !v.paused && v.readyState >= 2 && v.videoWidth && got !== false;
+      if (ok) return;
+      if (camRetried) { $("camMsg").textContent = "カメラが 動きません — アプリを 閉じて 開き直して ください"; return; }
+      camRetried = true;
+      $("camMsg").textContent = "カメラを 開き直しています…";
+      dropCam(); openCam();
+    }, 2000);
+  }
+  function dropCam() {   // 本当に 止める
+    clearTimeout(camOffTimer);
+    if (camStream) { camStream.getTracks().forEach(function (t) { t.stop(); }); camStream = null; }
+    $("camVideo").srcObject = null;
+  }
+  var cv = document.createElement("canvas"), cx = cv.getContext("2d", { willReadFrequently: true });
+  function camLoop() {
+    var v = $("camVideo");
+    if (!camStream || !camShown()) return;
+    var now = Date.now();
+    if (now >= camPauseUntil && v.readyState >= 2 && v.videoWidth) {
+      var w = Math.min(640, v.videoWidth), h = Math.round(v.videoHeight * w / v.videoWidth);
+      cv.width = w; cv.height = h; cx.drawImage(v, 0, 0, w, h);
+      var code = window.jsQR(cx.getImageData(0, 0, w, h).data, w, h, { inversionAttempts: "dontInvert" });
+      if (code && code.data && !(code.data === lastCode && now - lastCodeAt < 2500)) {
+        lastCode = code.data; lastCodeAt = now; camPauseUntil = now + 800;
+        var cam = $("cam"); cam.classList.add("hit"); clearTimeout(hitTimer);
+        hitTimer = setTimeout(function () { cam.classList.remove("hit"); }, 600);
+        var p = parseCode(code.data);
+        $("camMsg").textContent = "読みました: " + (p && !p.bad ? p.c + "-" + p.id : normalize(code.data).slice(0, 24)) + " — 次の ラベルへ";
+        handle(code.data);
+      } else if (code && code.data === lastCode) {
+        lastCodeAt = now;   // 同じ ラベルが 枠に ある 間は 読まない
+      }
+    }
+    camRaf = requestAnimationFrame(camLoop);
+  }
+  function closeCam() {   // 隠して 読むのを やめる。カメラは 1分 後に 止める
+    cancelAnimationFrame(camRaf); clearTimeout(camWatchT);
+    $("cam").classList.add("hidden"); $("cam").classList.remove("hit");
+    $("camBtn").classList.remove("on");
+    clearTimeout(camOffTimer);
+    if (camStream) camOffTimer = setTimeout(dropCam, CAM_KEEP_MS);
+  }
+  $("camClose").addEventListener("click", function () { closeCam(); });
+  // ほかの アプリに 行って 戻った 時: 開いていた カメラは 開き直す（動かなければ 見張りが 新しく 開く）
+  document.addEventListener("visibilitychange", function () {
+    if (document.hidden) { camWasOpen = camShown(); if (camWasOpen) closeCam(); }
+    else if (camWasOpen) { camWasOpen = false; camRetried = false; openCam(); }
+  });
+
+  // ── 新しい 版が 出ていたら 読み直す（ホーム画面の アプリは 古い 版を しばらく 覚えている）──
+  // 開いた 時だけ（カメラを 開いた 後に 読み直すと また 許可を 聞くので）。同じ 版へは 1回だけ（ループ しない）。
+  var VERSION = "2026-11-13b";
+  $("verLbl").textContent = "版 " + VERSION;
+  function checkUpdate() {
+    if (!window.fetch) return;
+    fetch(location.pathname + "?nc=" + Date.now(), { cache: "no-store", credentials: "omit" })
+      .then(function (r) { return r.ok ? r.text() : ""; })
+      .then(function (t) {
+        var m = t.match(/var VERSION = "([^"]+)"/);
+        if (!m || m[1] === VERSION) return;
+        var tried = ""; try { tried = sessionStorage.getItem("nishiki_scan_upd") || ""; } catch (e) {}
+        if (tried === m[1] || camStream || camOpening) return;
+        try { sessionStorage.setItem("nishiki_scan_upd", m[1]); } catch (e) {}
+        location.replace(location.pathname + "?v=" + encodeURIComponent(m[1]) + (dep ? "&d=" + encodeURIComponent(dep) : ""));
+      }).catch(function () {});
+  }
+  checkUpdate();
+
+  // ── はじめ ──
+  if (!API) show("vSetup");
+  else if (!token) showLogin("");
+  else startMain();
+})();
+</script>
+</body>
+</html>
