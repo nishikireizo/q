@@ -350,6 +350,7 @@
   .px.same { background: #fff5cf; border: 2px solid #e8c64a; }
   .px-h { font-size: 12px; font-weight: 700; color: #6b7280; }
   .px b { font-size: 16px; }
+  .px-d { font-size: 12px; color: #7a5d00; font-weight: 700; }
   .hand-card { border-color: #8a6d00; }
   .pop-btns .hand-go { background: #8a6d00; border-color: #8a6d00; color: #fff; }
   .rl-list { max-height: 55vh; overflow-y: auto; text-align: left; margin: 10px 0 4px; }
@@ -1434,6 +1435,8 @@
   function slipByKey(k) { return (pk.slips || []).filter(function (s) { return s.key === k; })[0] || null; }
   function unitOf(c, id) { var it = lists[c] && lists[c].items[id]; return (it && it.nishikata) || ""; }
   function pickMsg(kind, code, text, line, extra) { pk.msg = { kind: kind, code: code, text: text, line: line || "" }; if (mode === "shukko") showPop(kind, code, text, extra); }
+  // 入庫日 を 商品名の 前に — 同じ 商品が 多いので どの 入庫か 分かる よう（2026-11-13）
+  function inTxt(d) { var t = inDay(d); return t ? t + " 入庫 " : ""; }
   // ══ スキャン結果の ポップアップ — ✓ は 自動で 消える、✕（ちがう）と ⚠（もう 済み・古い ロット）は OK を 押すまで ══
   var popTimer = null, popHold = false;
   function showPop(kind, code, text, extra) {
@@ -1666,15 +1669,15 @@
     if (!l) {
       var it = lists[c] && lists[c].items[id];
       var same = it ? s.lines.filter(function (x) { return normName(x.name) === normName(it.name); })[0] : null;
-      pickMsg("bad", code, same ? "入庫日が ちがいます — 同じ 商品の 別の 入庫日です。伝票は " + same.id + "（" + inDay(same.nyukoDate) + " 入庫・" + (same.loc || "場所なし") + "）"
-                               : it ? "商品が ちがいます — 伝票に ない 商品です（" + it.name + "）" : "品番が ちがいます — この 伝票に ない 品番です");
+      pickMsg("bad", code, same ? "入庫日が ちがいます — 同じ 商品の 別の 入庫日です（スキャン " + inDay(it.nyukoDate) + " 入庫）。伝票は " + same.id + "（" + inDay(same.nyukoDate) + " 入庫・" + (same.loc || "場所なし") + "）"
+                               : it ? "商品が ちがいます — 伝票に ない 商品です（" + inTxt(it.nyukoDate) + it.name + "）" : "品番が ちがいます — この 伝票に ない 品番です");
       beep(false); renderPick(); return;
     }
     var had = slipLines(s)[l.id];
-    if (had) { pickMsg("warn", code, "もう チェック 済みです（" + (had.by ? had.by + " " : "") + l.name + "）", l.id); beep(false); renderPick(); return; }
+    if (had) { pickMsg("warn", code, "もう チェック 済みです（" + (had.by ? had.by + " " : "") + inTxt(l.nyukoDate) + l.name + "）", l.id); beep(false); renderPick(); return; }
     var old = olderLots(s, l);
     queuePick(s, l.id, true, false);
-    pickMsg(old.length ? "warn" : "ok", code, "✓ " + l.name + " " + l.qty + " " + unitOf(c, l.id) +
+    pickMsg(old.length ? "warn" : "ok", code, "✓ " + inTxt(l.nyukoDate) + l.name + " " + l.qty + " " + unitOf(c, l.id) +
       (old.length ? " — ⚠ もっと 古い ロット " + old[0].number + "（" + inDay(old[0].nyukoDate) + "・" + (old[0].location || "場所なし") + "）が あります" : ""), l.id, pickExtra(s, l));
     beep(true); renderPick();
   }
@@ -1710,7 +1713,7 @@
     $("rowListT").textContent = "📍 " + row + " — まだ 取って いない もの";
     $("rowListL").innerHTML = list.length ? list.map(function (o) {
       var here = s && o.s.key === s.key;
-      return '<div class="rl-it' + (here ? " here" : "") + '"><div class="rl-top"><b>' + esc(o.l.name) + "</b><span>" + esc(o.l.qty) + " " + esc(unitOf(o.s.c, o.l.id)) + "</span></div>" +
+      return '<div class="rl-it' + (here ? " here" : "") + '"><div class="rl-top"><b>' + esc(inTxt(o.l.nyukoDate) + o.l.name) + "</b><span>" + esc(o.l.qty) + " " + esc(unitOf(o.s.c, o.l.id)) + "</span></div>" +
         '<div class="rl-who">' + (here ? "この 伝票 — " : esc(o.s.time || "—") + " ") + esc(o.s.client) + (o.s.tantou ? "・" + esc(o.s.tantou) : "") + "・" + esc(o.l.loc || "") + "</div></div>";
     }).join("") : '<div class="hint">ありません</div>';
     $("rowList").classList.remove("hidden");
@@ -1721,21 +1724,21 @@
     var nm = normName(l.name), parts = [], tot = 0, html = "";
     (pk.slips || []).forEach(function (x) {
       if (x.key !== s.key && shipped(x)) return;
-      x.lines.forEach(function (y) { if (normName(y.name) === nm) { tot += parseFloat(y.qty) || 0; parts.push({ who: x.tantou || x.client, q: y.qty }); } });
+      x.lines.forEach(function (y) { if (normName(y.name) === nm) { tot += parseFloat(y.qty) || 0; parts.push({ who: x.tantou || x.client, q: y.qty, d: inDay(y.nyukoDate) }); } });
     });
     if (parts.length > 1) html += '<div class="px sum"><div class="px-h">きょう この 商品の 合計</div><b>' + esc(tot) + "</b> " + esc(unitOf(s.c, l.id)) + " ＝ " +
-      parts.map(function (p) { return esc(p.who) + " " + esc(p.q); }).join(" ＋ ") + "</div>";
+      parts.map(function (p) { return esc(p.who) + " " + esc(p.q) + (p.d ? '<span class="px-d">（' + esc(p.d) + "）</span>" : ""); }).join(" ＋ ") + "</div>";
     var rows = rowsOf(l.loc), seen = {}, other = [];
     rows.forEach(function (r) { rowTodo(r).forEach(function (o) { var k = o.s.key + "|" + o.l.id; if (seen[k] || (o.s.key === s.key && o.l.id === l.id)) return; seen[k] = 1; other.push(o); }); });
     if (other.length) html += '<div class="px same"><div class="px-h">📍 ' + esc(rows.join("・")) + " で ほかに 取る もの</div>" + other.slice(0, 6).map(function (o) {
-      return esc(o.l.name) + " <b>" + esc(o.l.qty) + "</b> → " + (o.s.key === s.key ? "この 伝票" : esc(o.s.tantou || o.s.client));
+      return esc(inTxt(o.l.nyukoDate) + o.l.name) + " <b>" + esc(o.l.qty) + "</b> → " + (o.s.key === s.key ? "この 伝票" : esc(o.s.tantou || o.s.client));
     }).join("<br>") + (other.length > 6 ? "<br>… ほか " + (other.length - 6) + " 件" : "") + "</div>";
     return html;
   }
   // QR なし — 目で 確かめて ✓（手）
   function askHand(s, id) {
     var l = s.lines.filter(function (x) { return x.id === id; })[0]; if (!l) return;
-    $("handT").textContent = l.name + " × " + l.qty + " " + unitOf(s.c, id);
+    $("handT").textContent = inTxt(l.nyukoDate) + l.name + " × " + l.qty + " " + unitOf(s.c, id);
     $("handS").textContent = id + "・" + (l.loc || "場所なし") + " — QR が ありません。商品と 数を 目で 確かめましたか？";
     $("handAsk").dataset.key = s.key; $("handAsk").dataset.id = id;
     $("handAsk").classList.remove("hidden");
@@ -1747,7 +1750,7 @@
     if (!s || shipped(s) || slipLines(s)[d.id]) { renderPick(); focusScan(); return; }
     var l = s.lines.filter(function (x) { return x.id === d.id; })[0];
     queuePick(s, d.id, true, true); beep(true);
-    pickMsg("ok", s.c + "-" + d.id, "✓ " + l.name + " " + l.qty + " " + unitOf(s.c, d.id) + "（手）", d.id, pickExtra(s, l));
+    pickMsg("ok", s.c + "-" + d.id, "✓ " + inTxt(l.nyukoDate) + l.name + " " + l.qty + " " + unitOf(s.c, d.id) + "（手）", d.id, pickExtra(s, l));
     renderPick(); focusScan();
   });
 
@@ -1792,7 +1795,7 @@
       var row = function (k, v) { return '<div class="sp-row"><span>' + k + "</span><b>" + esc(v || "—") + "</b></div>"; };
       return '<button type="button" data-key="' + esc(x.key) + '">' +
         '<div class="sp-top"><span>' + esc(x.time || "—") + "</span><span>" + esc(x.client) + '</span><span class="sp-qty">' + esc(l.qty == null ? "" : l.qty) + " " + esc(unitOf(c, id)) + "</span></div>" +
-        row("引取先", x.hikitori) + row("運送", x.unso) + row("担当者", x.tantou) +
+        row("入庫日", inDay(l.nyukoDate)) + row("引取先", x.hikitori) + row("運送", x.unso) + row("担当者", x.tantou) +
         '<div class="sp-prog">' + x.lines.length + " 行・チェック " + n + " / " + x.lines.length + "</div></button>";
     }).join("");
     $("slipAsk").dataset.c = c; $("slipAsk").dataset.id = id;
@@ -1921,7 +1924,7 @@
       }
     });
   }
-  // ── 🏷 ラベル印刷（この 画面で・2026-11-12）— A4 横・1枚・大きさは 自動。扇屋（27）だけ 通常 / いりこ用 ──
+  // ── 🏷 ラベル印刷（この 画面で・2026-11-12）— A4 横・1枚・大きさは 自動。得意先 27 だけ 通常 / いりこ用 ──
   //   ラベルは 277mm × 190mm（1047 × 718 px）で 作って、画面では 小さく 見せる。印刷も 同じ もの。
   var QR_SRC = "https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js";
   var QR_SRI = "sha384-3zSEDfvllQohrq0PHL1fOXJuC/jSOO34H46t6UQfobFOmxE5BpjjaIJY5F2/bMnU";
@@ -2271,7 +2274,7 @@
 
   // ── 新しい 版が 出ていたら 読み直す（ホーム画面の アプリは 古い 版を しばらく 覚えている）──
   // 開いた 時だけ（カメラを 開いた 後に 読み直すと また 許可を 聞くので）。同じ 版へは 1回だけ（ループ しない）。
-  var VERSION = "2026-11-12i";
+  var VERSION = "2026-11-13b";
   $("verLbl").textContent = "版 " + VERSION;
   function checkUpdate() {
     if (!window.fetch) return;
