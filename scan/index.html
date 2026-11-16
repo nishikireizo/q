@@ -288,6 +288,19 @@
   .pk-view { display: flex; margin: 10px 0 4px; border: 1px solid #c9d8d3; border-radius: 12px; overflow: hidden; background: #fff; }
   .pk-view button { flex: 1; border: none; background: none; padding: 10px 6px; font-weight: 700; font-size: 15px; font-family: inherit; color: #4b5d57; cursor: pointer; }
   .pk-view button.on { background: #2f6b5a; color: #fff; }
+  .bi-find { display: flex; gap: 6px; margin: 8px 0 6px; }
+  .bi-find input { flex: 1; min-width: 0; height: 46px; border: 2px solid #c9d8d3; border-radius: 12px; padding: 0 12px; font-size: 17px; font-family: inherit; background: #fff; color: inherit; }
+  .bi-find input:focus { border-color: #2f6b5a; outline: none; }
+  .bi-find button { width: 46px; height: 46px; border: 1px solid #c9d8d3; border-radius: 12px; background: #fff; font-size: 18px; color: #6b7b75; }
+  .bi-left { margin: 4px 0 2px; padding: 8px 12px; border-radius: 10px; background: #fff3d6; color: #7a5d00; font-weight: 800; font-size: 15px; }
+  .bi-left.done { background: #dff2e7; color: #1d7a4a; }
+  .bi-none { padding: 18px 8px; text-align: center; color: #6b7b75; font-size: 14px; }
+  .bi-more { display: block; width: 100%; border: none; border-top: 1px dashed #d9e4e0; background: #f7fbfa; padding: 7px 12px; text-align: left; font-family: inherit; font-size: 13px; font-weight: 600; color: #1f4fbf; cursor: pointer; }
+  .bi-hide { display: none !important; }
+  .qa-all { display: block; width: 100%; margin-top: 10px; padding: 14px 10px; border: none; border-radius: 14px; background: #1d7a4a; color: #fff; font-family: inherit; font-size: 19px; font-weight: 800; cursor: pointer; }
+  .qa-or { margin-top: 10px; font-size: 12px; color: #6b7280; }
+  .qa-who { margin-top: 6px; display: inline-block; padding: 3px 10px; border-radius: 999px; background: #eef4ff; color: #1f4fbf; font-size: 14px; font-weight: 800; }
+  .qa-who:empty { display: none; }
   .bi-rm { margin: 12px 0 4px; font-weight: 800; color: #2f6b5a; font-size: 15px; border-bottom: 2px solid #2f6b5a; padding-bottom: 2px; }
   .bi { background: #fff; border: 1px solid #d9e4e0; border-radius: 12px; margin: 6px 0; overflow: hidden; }
   .bi-h { display: flex; align-items: center; gap: 10px; width: 100%; border: none; background: none; padding: 10px 12px; text-align: left; font: inherit; color: inherit; cursor: pointer; }
@@ -585,7 +598,8 @@
     </div>
     <div id="qtyAsk" class="pop ask hidden" role="dialog">
       <div class="pop-card qty-card"><div class="qa-code" id="qaCode"></div><div class="pop-t" id="qaT"></div><div class="pop-s" id="qaS"></div>
-        <div class="qa-need" id="qaNeed"></div><div class="qa-done" id="qaDone"></div>
+        <div class="qa-who" id="qaWho"></div><div class="qa-need" id="qaNeed"></div><div class="qa-done" id="qaDone"></div>
+        <button type="button" class="qa-all" id="qaAll"></button><div class="qa-or">パレットごとに 数える 時は 下で</div>
         <div class="qa-h"><b id="qaP"></b><button type="button" class="link" id="qaMode"></button></div>
         <div class="qa-f" id="qaF"></div>
         <div class="qa-r" id="qaR"></div>
@@ -1595,7 +1609,7 @@
         return s;
       }).filter(function (s) { return s.lines.length; })
         .sort(function (a, b) { return a.time < b.time ? -1 : a.time > b.time ? 1 : Number(a.c) - Number(b.c); });
-      if (freshPicks(date, v)) { pk.server = j.picks || {}; pk.serverDate = date; }
+      if (freshPicks(date, v)) { pk.server = j.picks || {}; pk.serverDate = date; palFromServer(date, j.pals); }
       pk.loadedDate = date;
       if (pk.open && !slipByKey(pk.open)) pk.open = "";
     }).catch(function (e) { if (my === pk.seq && !e.auth) pk.err = e.message || String(e); })
@@ -1606,7 +1620,7 @@
     var date = pk.date, v = pk.ver;
     apiGet({ api: "picks", date: date }).then(function (j) {
       if (date !== pk.date || !freshPicks(date, v)) return;
-      pk.server = j.picks || {}; pk.serverDate = date; renderPick();
+      pk.server = j.picks || {}; pk.serverDate = date; palFromServer(date, j.pals); renderPick();
     }).catch(function () {});
   }
   // 貯めた ✓ を 順に 送る
@@ -1614,10 +1628,12 @@
     if (pk.sending || !pickQ.length) return;
     var q = pickQ[0];
     pk.sending = true;
-    apiPost({ api: "pick", date: q.date, key: q.key, client: q.c, id: q.id, on: q.on, hand: q.hand })
+    (q.pal ? apiPost({ api: "pal", date: q.date, key: q.key, client: q.c, id: q.id, pals: q.pals || [] })
+           : apiPost({ api: "pick", date: q.date, key: q.key, client: q.c, id: q.id, on: q.on, hand: q.hand }))
       .then(function (j) {
         pickQ.shift(); saveQ(); pk.ver++;
-        if (q.date === pk.date && pk.serverDate === pk.date) pk.server[q.key] = j.lines || {};
+        if (q.pal) { if (j.pals && !pickQ.some(function (x) { return x.pal && x.key === q.key; })) palFromKey(q.date, q.key, j.pals); }
+        else if (q.date === pk.date && pk.serverDate === pk.date) pk.server[q.key] = j.lines || {};
         pk.sending = false; renderPick(); flushQ();
       })
       .catch(function (e) {
@@ -1653,6 +1669,12 @@
 
   function renderPick() {
     if (mode !== "shukko") return;
+    var hadFind = document.activeElement && document.activeElement.id === "biFind";
+    renderPick0();
+    var bf = $("biFind");
+    if (bf) { bf.value = biQ; if (hadFind) { try { bf.focus({ preventScroll: true }); bf.setSelectionRange(biQ.length, biQ.length); } catch (e) {} } biFilter(); }
+  }
+  function renderPick0() {
     var s = pk.open && slipByKey(pk.open);
     $("mnTitle").textContent = s ? "出庫 ピッキング" : "出庫";
     $("pickView").classList.toggle("open", !!s);
@@ -1672,7 +1694,7 @@
   var GROUP_TANTOU = { "27": 1 };
   function grpOf(s) { return String((GROUP_TANTOU[s.c] ? s.tantou : s.hikitori) || ""); }
   function grpLabel(c) { return GROUP_TANTOU[c] ? "担当" : "引取先"; }
-  var PV_KEY = "nishiki_scan_pkview", pkView = lsGet(PV_KEY) || "slip";
+  var PV_KEY = "nishiki_scan_pkview2", pkView = lsGet(PV_KEY) || "item";   // はじめは 商品の 一覧（2026-11-16）
   var biOpen = {};   // 開いて いる 品物（得意先|品番）
   function itemListHtml(slips) {   // 案 2: 得意先 → 場所の 見出し → 品物（合計）。タップで 伝票ごとの 数（案 1）
     var todo = slips.filter(function (s) { return !shipped(s); }), byC = [], cMap = {};
@@ -1687,7 +1709,12 @@
       });
     });
     if (!byC.length) return '<div class="hint">のこりの 伝票は ありません（🚚 出庫済み だけ）</div>';
-    return '<div class="pk-hint">場所の 順。品物を タップ → 伝票ごとの 数。ラベルを スキャンで チェック</div>' +
+    var allN = 0, leftN = 0;
+    byC.forEach(function (C) { C.items.forEach(function (it) { allN++; if (!it.slips.every(function (x) { return x.ok; })) leftN++; }); });
+    return '<div class="bi-find"><input type="search" id="biFind" placeholder="🔍 品名・品番・場所・得意先" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="search">' +
+        '<button type="button" data-bi-x="1" aria-label="消す">✕</button></div>' +
+      '<div class="bi-left' + (leftN ? "" : " done") + '">' + (leftN ? "のこり " + leftN + " 品 / " + allN : "✓ ぜんぶ チェック済み（" + allN + " 品）") + "</div>" +
+      '<div class="pk-hint">品物を タップ → 数を 確かめて ✓（QR が 無くても OK）。ラベルを スキャンしても 同じ</div>' +
       byC.map(function (C) {
         var items = C.items.slice().sort(function (a, b) { var x = locKey(a.l.loc), y = locKey(b.l.loc); return x < y ? -1 : x > y ? 1 : 0; });
         var left = items.filter(function (it) { return !it.slips.every(function (x) { return x.ok; }); }).length, room = null;
@@ -1697,17 +1724,67 @@
             var ok = it.slips.every(function (x) { return x.ok; }), part = !ok && it.slips.some(function (x) { return x.ok || x.ps; });
             var loc = l.loc || "場所なし", head = loc !== room ? '<div class="bi-rm">' + esc(loc) + "</div>" : ""; room = loc;
             var dup = function (x) { return it.slips.filter(function (y) { return grpOf(y.s) === grpOf(x.s); }).length > 1; };
-            return head + '<div class="bi' + (ok ? " ok" : part ? " part" : "") + '">' +
-              '<button type="button" class="bi-h" data-bi="' + esc(k) + '"><span class="bi-ck">' + (ok ? "✓" : "") + "</span>" +
-                '<span class="bi-nm">' + esc(l.name) + "<small>" + esc(inDay(l.nyukoDate) || "—") + " 入庫 · " +
-                  '<span class="bi-tg">伝票 ' + it.slips.length + (open ? " ▲" : " ▼") + "</span></small></span>" +
+            var who = it.slips.map(function (x) { return grpOf(x.s); }).filter(function (v, i, a) { return v && a.indexOf(v) === i; });
+            var txt = biNorm([l.name, l.id, loc, C.client, inDay(l.nyukoDate)].concat(who).join(" "));
+            return head + '<div class="bi' + (ok ? " ok" : part ? " part" : "") + '" data-s="' + esc(txt) + '">' +
+              '<button type="button" class="bi-h" data-bi-go="' + esc(k) + '"><span class="bi-ck">' + (ok ? "✓" : "") + "</span>" +
+                '<span class="bi-nm">' + esc(l.name) + "<small>" + esc(inDay(l.nyukoDate) || "—") + " 入庫 · " + esc(l.id) +
+                  (it.slips.length === 1 && who.length ? " · " + esc(who[0]) : "") + "</small></span>" +
                 '<span class="bi-q">' + esc(String(part ? it.need - it.got : it.need)) + "<small>" + (part ? "のこり" : esc(u)) + "</small></span></button>" +
+              (it.slips.length > 1 ? '<button type="button" class="bi-more" data-bi="' + esc(k) + '">伝票 ' + it.slips.length + " 枚（" + esc(who.join("・")) + "）" + (open ? " ▲" : " ▼") + "</button>" : "") +
               (open ? '<div class="bi-br">' + it.slips.map(function (x) {
                 return '<button type="button" class="' + (x.ok ? "ok" : "") + '" data-slip="' + esc(x.s.key) + '"><span>' + (x.ok ? "✓ " : "") +
                   esc((grpOf(x.s) || "—") + (dup(x) ? " " + (x.s.time || "") : "")) + "</span><b>" + (x.ps && !x.ok ? x.ps + " / " : "") + esc(x.q) + "</b></button>";
               }).join("") + "</div>" : "") + "</div>";
           }).join("");
-      }).join("");
+      }).join("") + '<div class="bi-none bi-hide" id="biNone">見つかりません</div>';
+  }
+  // 探す — かな・カナ、全角・半角、空白は 気にしない
+  var biQ = "";
+  function biNorm(t) {
+    t = String(t || ""); try { t = t.normalize("NFKC"); } catch (e) {}
+    return t.toLowerCase().replace(/[\u3041-\u3096]/g, function (c) { return String.fromCharCode(c.charCodeAt(0) + 96); }).replace(/\s+/g, "");
+  }
+  function biFilter() {
+    var box = $("pickList"), q = String(biQ || "").split(/[\s\u3000]+/).map(biNorm).filter(Boolean), g = null, rm = null, any = false, gAny = false, rAny = false;
+    if (!box) return;
+    var close = function () { if (rm) rm.classList.toggle("bi-hide", !rAny); };
+    Array.prototype.forEach.call(box.children, function (el) {
+      var cl = el.classList;
+      if (cl.contains("pk-g")) { close(); rm = null; if (g) g.classList.toggle("bi-hide", !gAny); g = el; gAny = false; }
+      else if (cl.contains("bi-rm")) { close(); rm = el; rAny = false; }
+      else if (cl.contains("bi") && el.hasAttribute("data-s")) {
+        var ds = el.getAttribute("data-s"), hit = q.every(function (w) { return ds.indexOf(w) >= 0; });
+        cl.toggle("bi-hide", !hit);
+        if (hit) { any = true; gAny = true; rAny = true; }
+      }
+    });
+    close(); if (g) g.classList.toggle("bi-hide", !gAny);
+    var none = $("biNone"); if (none) none.classList.toggle("bi-hide", any || !q.length);
+  }
+  // 品物を タップ → まだ ✓ の 無い 伝票を 時刻の 順に、数の 確認を 続けて 出す
+  var biChain = null;
+  function biGo(k) {
+    var i = k.indexOf("|"), c = k.slice(0, i), id = k.slice(i + 1);
+    var list = (pk.slips || []).filter(function (s) {
+      return s.c === c && !shipped(s) && !slipLines(s)[id] && s.lines.some(function (l) { return l.id === id; }); });
+    if (!list.length) { biOpen[k] = !biOpen[k]; renderPick(); return; }
+    biChain = { id: id, list: list.map(function (s) { return s.key; }), total: list.length };
+    biNext();
+  }
+  function biNext() {
+    if (!biChain) return;
+    if (qa) return;   // まだ 開いて いる
+    while (biChain.list.length) {
+      var s = slipByKey(biChain.list[0]), l = s && s.lines.filter(function (x) { return x.id === biChain.id; })[0];
+      if (s && l && !shipped(s) && !slipLines(s)[l.id] && !pickQ.some(function (q) { return !q.pal && q.on && q.key === s.key && q.id === l.id; }) && needOf(l) > 0) {
+        clearTimeout(popTimer); $("pop").className = "pop hidden";
+        openQty(s, l, true);
+        return;
+      }
+      biChain.list.shift();
+    }
+    biChain = null;
   }
   function renderSlipList(open) {   // open = 伝票を 開いて いる（メッセージは 伝票の 方に 出す）
     var slips = pk.slips || [], done = 0, wait = 0, firstOf = {};
@@ -1826,7 +1903,28 @@
   function palKey(s, id) { return pk.date + "|" + s.key + "|" + id; }
   function palOf(s, id) { return pal[palKey(s, id)] || []; }
   function palSum(s, id) { return palOf(s, id).reduce(function (a, p) { return a + p.n; }, 0); }
-  function palClear(s, id) { delete pal[palKey(s, id)]; lsSet(PAL_KEY, JSON.stringify(pal)); }
+  function palSave() { lsSet(PAL_KEY, JSON.stringify(pal)); }
+  function palSet(s, id, list) {   // その 伝票・品番の パレット ぜんぶを 置いて サーバーへ（upload 140）
+    var k = palKey(s, id);
+    if (list && list.length) pal[k] = list; else delete pal[k];
+    palSave();
+    pickQ.push({ pal: true, date: pk.date, key: s.key, c: s.c, id: id, pals: list || [], at: Date.now() }); pk.ver++;
+    saveQ(); flushQ();
+  }
+  function palClear(s, id) { if (pal[palKey(s, id)]) palSet(s, id, []); }
+  function palFromKey(date, key, m) {   // サーバーの 1枚の 伝票ぶん → 置きかえ
+    var pre = date + "|" + key + "|";
+    Object.keys(pal).forEach(function (k) { if (k.indexOf(pre) === 0) delete pal[k]; });
+    Object.keys(m || {}).forEach(function (id) { if (m[id] && m[id].length) pal[pre + id] = m[id]; });
+    palSave();
+  }
+  function palFromServer(date, all) {   // その 日 ぜんぶ（古い サーバーで pals が 無い 時は さわらない）
+    if (!all || typeof all !== "object") return;
+    var pre = date + "|";
+    Object.keys(pal).forEach(function (k) { if (k.indexOf(pre) === 0) delete pal[k]; });
+    Object.keys(all).forEach(function (key) { palFromKey(date, key, all[key]); });
+    palSave();
+  }
   function palTxt(p) { return p.d ? p.d + "段 × " + p.p + (p.b ? " ＋ " + p.b : "") + " ＝ " + p.n : String(p.n); }
   function needOf(l) { var n = parseFloat(l.qty); return n > 0 && n === Math.floor(n) ? n : 0; }
   function openQty(s, l, hand) {
@@ -1842,6 +1940,8 @@
     $("qaP").textContent = "パレット " + (done.length + 1);
     $("qaKeys").innerHTML = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "次 ›", "0", "⌫"].map(function (k) {
       return '<button type="button" data-k="' + k + '"' + (k.length > 1 || k === "⌫" ? ' class="fn"' : "") + ">" + k + "</button>"; }).join("");
+    $("qaAll").textContent = "✓ " + (done.length ? "のこり " : "伝票どおり ") + left + " " + u + " 取った";
+    $("qaWho").textContent = biChain ? [grpOf(s), s.time].filter(Boolean).join(" ") + (biChain.total > 1 ? "　伝票 " + (biChain.total - biChain.list.length + 1) + " / " + biChain.total : "") : "";
     $("qtyAsk").classList.remove("hidden");
     drawQty();
   }
@@ -1874,7 +1974,14 @@
     else if (v[f].length < 4 && !(k === "0" && !v[f])) v[f] += k;
     drawQty();
   });
-  $("qaNo").addEventListener("click", function () { qa = null; $("qtyAsk").classList.add("hidden"); focusScan(); });
+  $("qaNo").addEventListener("click", function () { qa = null; biChain = null; $("qtyAsk").classList.add("hidden"); focusScan(); });
+  $("qaAll").addEventListener("click", function () {   // 伝票どおり — 1タップ（パレットは 1つ として 記録）
+    if (!qa) return;
+    qa.dan = false; qa.v = { d: "", p: "", b: "", n: String(qa.left) }; qa.f = "n";
+    drawQty();
+    $("qaGo").click();
+  });
+  $("qaGo").addEventListener("click", function () { setTimeout(biNext, 0); });   // 同じ 品物が ほかの 伝票にも → 続けて 出す
   $("qaGo").addEventListener("click", function () {
     if (!qa) return;
     var s = slipByKey(qa.key), t = qtyTotal(), q = qa, n = function (x) { return parseInt(x, 10) || 0; };
@@ -1883,7 +1990,7 @@
     if (!s || !l || shipped(s) || slipLines(s)[q.id] || !t || t > q.left) { renderPick(); focusScan(); return; }
     var k = palKey(s, q.id), list = pal[k] || (pal[k] = []);
     list.push(q.dan ? { d: n(q.v.d), p: n(q.v.p), b: n(q.v.b), n: t } : { n: t });
-    lsSet(PAL_KEY, JSON.stringify(pal));
+    palSet(s, q.id, list);
     var u = unitOf(s.c, q.id), code = s.c + "-" + q.id;
     if (t === q.left) {
       queuePick(s, q.id, true, q.hand); beep(true);
@@ -1968,6 +2075,9 @@
   });
 
   $("pickView").addEventListener("click", function (e) {
+    if (e.target.closest("[data-bi-x]")) { biQ = ""; renderPick(); return; }
+    var bg = e.target.closest("[data-bi-go]");
+    if (bg) { biGo(bg.getAttribute("data-bi-go")); return; }
     var bh = e.target.closest("[data-bi]");
     if (bh) { var bk = bh.getAttribute("data-bi"); biOpen[bk] = !biOpen[bk]; renderPick(); return; }
     var b = e.target.closest("[data-pk], [data-slip], [data-line], [data-row]"); if (!b) return;
@@ -2515,7 +2625,7 @@
 
   // ── 新しい 版が 出ていたら 読み直す（ホーム画面の アプリは 古い 版を しばらく 覚えている）──
   // 開いた 時だけ（カメラを 開いた 後に 読み直すと また 許可を 聞くので）。同じ 版へは 1回だけ（ループ しない）。
-  var VERSION = "2026-11-16d";
+  var VERSION = "2026-11-16f";
   $("verLbl").textContent = "版 " + VERSION;
   function checkUpdate() {
     if (!window.fetch) return;
@@ -2537,6 +2647,16 @@
     $("setupCamSlot").appendChild($("scanErr")); $("setupCamSlot").appendChild($("cam"));
     camRetried = false;
     openCam();
+  });
+
+  // 探す 箱 — 打つ たびに 絞る。Enter: ラベルの 形（27-10001）なら スキャンと 同じ
+  $("pickView").addEventListener("input", function (e) { if (e.target && e.target.id === "biFind") { biQ = e.target.value; biFilter(); } });
+  $("pickView").addEventListener("keydown", function (e) {
+    if (!e.target || e.target.id !== "biFind" || e.key !== "Enter") return;
+    e.preventDefault();
+    var p = parseCode(e.target.value);
+    if (p && !p.bad && !p.noClient) { biQ = ""; e.target.value = ""; handle(p.c + "-" + p.id); }
+    else e.target.blur();
   });
 
   // ── はじめ ──
