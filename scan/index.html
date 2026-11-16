@@ -108,7 +108,7 @@
   /* カメラは 画面の 上に 開いた まま（連続 スキャン）— 下の カードで 結果が 見える */
   .cam { position: relative; margin: 0 16px 12px; height: 38vh; min-height: 220px; max-height: 340px;
          background: #000; border-radius: 14px; overflow: hidden; }
-  .cam video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .cam video { position: absolute; top: 0; right: 0; bottom: 0; left: 0; inset: 0; width: 100%; height: 100%; object-fit: cover; }
   .cam .frame { position: absolute; left: 50%; top: 45%; width: 58%; aspect-ratio: 1; max-height: 78%;
                 transform: translate(-50%, -50%); border: 3px solid rgba(255,255,255,0.85); border-radius: 16px;
                 transition: border-color 0.15s, box-shadow 0.15s; }
@@ -308,6 +308,38 @@
   .pk-g2 { margin: 8px 0 4px 4px; font-size: 14px; font-weight: 800; color: #2f6b5a; }
   .pk-g2 small { font-weight: 500; color: #6b7280; margin-right: 6px; }
   .slip-pick .sp-n { font-size: 13px; color: #6b7280; margin-top: 4px; }
+  /* 数の 確認 — パレットごとに 段 × 1段の 数 ＋ バラ（2026-11-13）*/
+  .qty-card { max-height: 96vh; overflow-y: auto; }
+  .qa-code { font-size: 12px; color: #6b7280; }
+  .qa-need { margin-top: 10px; border-radius: 16px; background: #1d5f8a; color: #fff; padding: 8px 12px 10px; display: flex; align-items: baseline; justify-content: center; gap: 10px; }
+  .qa-need small { font-size: 15px; font-weight: 700; opacity: .9; }
+  .qa-need b { font-size: 54px; font-weight: 800; line-height: 1; }
+  .qa-need span { font-size: 20px; font-weight: 700; }
+  .qa-need em { font-style: normal; font-size: 13px; opacity: .9; align-self: center; }
+  .qty-card .pop-t { font-size: 20px; }
+  .qa-done { text-align: left; font-size: 14px; line-height: 1.6; margin-top: 8px; }
+  .qa-done:empty { display: none; }
+  .qa-done div { background: #e7f2ee; border-radius: 10px; padding: 4px 10px; margin-top: 4px; }
+  .qa-h { display: flex; align-items: baseline; justify-content: space-between; margin-top: 12px; }
+  .qa-h b { font-size: 18px; color: var(--blue); }
+  .qa-f { display: flex; align-items: flex-end; justify-content: center; gap: 6px; margin-top: 8px; }
+  .qa-f .bx { flex: 1; max-width: 110px; border: 3px solid #c8d3cf; border-radius: 14px; background: #fff; padding: 4px 4px 8px; font: inherit; color: inherit; cursor: pointer; }
+  .qa-f .bx.on { border-color: var(--blue); background: #eef4ff; }
+  .qa-f .bx small { display: block; font-size: 12px; color: #6b7280; }
+  .qa-f .bx b { display: block; font-size: 34px; font-weight: 800; line-height: 1.15; min-height: 39px; }
+  .qa-f .op { font-size: 24px; font-weight: 800; color: #6b7280; padding-bottom: 14px; }
+  .qa-r { margin-top: 10px; border-radius: 12px; padding: 8px 10px; font-size: 17px; font-weight: 800; background: #f1f4f3; color: #6b7280; }
+  .qa-r.ok { background: #e7f2ee; color: #2f6b5a; }
+  .qa-r.less { background: #fff5cf; color: #7a5d00; }
+  .qa-r.over { background: #fde8e6; color: #b3261e; }
+  .qa-keys { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; }
+  .qa-keys button { padding: 12px 0; font-size: 24px; font-weight: 700; border-radius: 12px; border: 2px solid #c8d3cf; background: #fff; color: inherit; cursor: pointer; }
+  .qa-keys button:active { background: #eef4ff; }
+  .qa-keys button.fn { font-size: 16px; background: #f1f4f3; }
+  #qaGo:disabled { opacity: .4; }
+  .pl.part .pl-st { font-size: 14px; font-weight: 800; color: #7a5d00; white-space: nowrap; }
+  .pl.part { border-color: #e8c64a; background: #fffbea; }
+  .pl-pal { font-size: 12px; color: #7a5d00; font-weight: 700; }
   /* 同じ 品番が 2枚 以上の 伝票に ある 時 — 伝票を 選ぶ（2026-11-12）*/
   .slip-pick { display: flex; flex-direction: column; gap: 10px; margin: 12px 0 4px; max-height: 52vh; overflow-y: auto; text-align: left; }
   .slip-pick button { display: block; width: 100%; text-align: left; background: #fff; border: 2px solid var(--blue); border-radius: 14px; padding: 12px 14px; font: inherit; color: inherit; cursor: pointer; }
@@ -387,7 +419,7 @@
   .rl-top span { margin-left: auto; font-weight: 800; font-size: 17px; white-space: nowrap; }
   .rl-who { font-size: 13px; color: #6b7280; }
   /* ══ スキャン結果の ポップアップ ══ */
-  .pop { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; padding: 20px;
+  .pop { position: fixed; top: 0; right: 0; bottom: 0; left: 0; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; padding: 20px;
          background: rgba(20, 40, 35, .45); }
   .pop-card { width: min(100%, 440px); background: #fff; border-radius: 24px; padding: 28px 22px 22px; text-align: center;
               box-shadow: 0 18px 50px rgba(0,0,0,.25); border: 4px solid var(--accent); animation: popin .16s ease-out; }
@@ -550,6 +582,15 @@
     <div id="handAsk" class="pop ask hidden" role="dialog">
       <div class="pop-card hand-card"><div class="pop-t" id="handT"></div><div class="pop-s" id="handS"></div>
         <div class="pop-btns"><button type="button" id="handNo">やめる</button><button type="button" class="go hand-go" id="handYes">確かめた ✓</button></div></div>
+    </div>
+    <div id="qtyAsk" class="pop ask hidden" role="dialog">
+      <div class="pop-card qty-card"><div class="qa-code" id="qaCode"></div><div class="pop-t" id="qaT"></div><div class="pop-s" id="qaS"></div>
+        <div class="qa-need" id="qaNeed"></div><div class="qa-done" id="qaDone"></div>
+        <div class="qa-h"><b id="qaP"></b><button type="button" class="link" id="qaMode"></button></div>
+        <div class="qa-f" id="qaF"></div>
+        <div class="qa-r" id="qaR"></div>
+        <div class="qa-keys" id="qaKeys"></div>
+        <div class="pop-btns"><button type="button" id="qaNo">やめる</button><button type="button" class="go" id="qaGo"></button></div></div>
     </div>
     <div id="rowList" class="pop ask hidden" role="dialog">
       <div class="pop-card"><div class="pop-t" id="rowListT"></div><div class="pop-s">同じ 得意先の きょうの 伝票（出庫済みは 除く）</div>
@@ -1640,9 +1681,9 @@
       var m = slipLines(s);
       s.lines.forEach(function (l) {
         var it = C.iMap[l.id]; if (!it) { it = C.iMap[l.id] = { l: l, need: 0, got: 0, slips: [] }; C.items.push(it); }
-        var q = parseFloat(l.qty) > 0 ? parseFloat(l.qty) : 0, d = m[l.id];
-        it.need += q; if (d) it.got += q;
-        it.slips.push({ s: s, q: l.qty, ok: !!d });
+        var q = parseFloat(l.qty) > 0 ? parseFloat(l.qty) : 0, d = m[l.id], ps = palSum(s, l.id);
+        it.need += q; it.got += d ? q : Math.min(ps, q);
+        it.slips.push({ s: s, q: l.qty, ok: !!d, ps: ps });
       });
     });
     if (!byC.length) return '<div class="hint">のこりの 伝票は ありません（🚚 出庫済み だけ）</div>';
@@ -1653,7 +1694,7 @@
         return '<div class="pk-g"><b>' + esc(C.client) + "</b><span>のこり " + left + " / " + items.length + "</span></div>" +
           items.map(function (it) {
             var l = it.l, u = unitOf(C.c, l.id), k = C.c + "|" + l.id, open = !!biOpen[k];
-            var ok = it.slips.every(function (x) { return x.ok; }), part = !ok && it.slips.some(function (x) { return x.ok; });
+            var ok = it.slips.every(function (x) { return x.ok; }), part = !ok && it.slips.some(function (x) { return x.ok || x.ps; });
             var loc = l.loc || "場所なし", head = loc !== room ? '<div class="bi-rm">' + esc(loc) + "</div>" : ""; room = loc;
             var dup = function (x) { return it.slips.filter(function (y) { return grpOf(y.s) === grpOf(x.s); }).length > 1; };
             return head + '<div class="bi' + (ok ? " ok" : part ? " part" : "") + '">' +
@@ -1663,7 +1704,7 @@
                 '<span class="bi-q">' + esc(String(part ? it.need - it.got : it.need)) + "<small>" + (part ? "のこり" : esc(u)) + "</small></span></button>" +
               (open ? '<div class="bi-br">' + it.slips.map(function (x) {
                 return '<button type="button" class="' + (x.ok ? "ok" : "") + '" data-slip="' + esc(x.s.key) + '"><span>' + (x.ok ? "✓ " : "") +
-                  esc((grpOf(x.s) || "—") + (dup(x) ? " " + (x.s.time || "") : "")) + "</span><b>" + esc(x.q) + "</b></button>";
+                  esc((grpOf(x.s) || "—") + (dup(x) ? " " + (x.s.time || "") : "")) + "</span><b>" + (x.ps && !x.ok ? x.ps + " / " : "") + esc(x.q) + "</b></button>";
               }).join("") + "</div>" : "") + "</div>";
           }).join("");
       }).join("");
@@ -1723,18 +1764,19 @@
       (sh ? "" : rowStrips(s)) +
       '<div class="pane active pk-lines"><div class="sec-head">場所の 順・ラベルを 読むと ✓</div>' +
       lines.map(function (l) {
-        var d = m[l.id], old = olderLots(s, l), u = unitOf(s.c, l.id);
-        return '<div class="pl' + (d ? " ok" : "") + (d && d.hand ? " hand" : "") + (sh ? " gone" : "") + (pk.msg && pk.msg.line === l.id ? " last" : "") + '" data-line="' + esc(l.id) + '">' +
+        var d = m[l.id], old = olderLots(s, l), u = unitOf(s.c, l.id), pp = palOf(s, l.id), ps = palSum(s, l.id);
+        return '<div class="pl' + (d ? " ok" : ps ? " part" : "") + (d && d.hand ? " hand" : "") + (sh ? " gone" : "") + (pk.msg && pk.msg.line === l.id ? " last" : "") + '" data-line="' + esc(l.id) + '">' +
           '<div class="pl-loc">' + esc(l.loc || "—") + "</div>" +
           '<div class="pl-main"><div class="pl-id">' + esc(l.id) + (l.yoyaku ? ' <span class="kr-tag yy">予約</span>' : "") + "</div>" +
             '<div class="pl-name">' + esc(l.name) + "</div>" +
             '<div class="pl-in">入庫 ' + esc(inDay(l.nyukoDate) || "—") +
               (d ? " · ✓ " + esc(d.by || "") + (d.at ? " " + hhmm(d.at) : "") + (d.hand ? "（手）" : "") + (d.wait ? " 未送信" : "") : "") + "</div>" +
+            (pp.length ? '<div class="pl-pal">' + pp.map(function (p, i) { return "P" + (i + 1) + "：" + esc(palTxt(p)); }).join("　") + "</div>" : "") +
             (old.length && !d ? '<div class="pl-fifo">⚠ 先入れ先出し: もっと 古い ロット ' + esc(old[0].number) + "（" + esc(inDay(old[0].nyukoDate)) + " 入庫・" +
               esc(old[0].location || "場所なし") + "・在庫 " + realStock(old[0]) + "）" + (old.length > 1 ? " ほか " + (old.length - 1) : "") + "</div>" : "") +
           "</div>" +
           '<div class="pl-qty"><b>' + esc(l.qty) + "</b><span>" + esc(u) + "</span></div>" +
-          '<div class="pl-st">' + (d ? (d.hand ? "手" : "✓") : "") + "</div></div>";
+          '<div class="pl-st">' + (d ? (d.hand ? "手" : "✓") : ps ? ps + "/" + esc(l.qty) : "") + "</div></div>";
       }).join("") +
       '<div class="pk-foot"><button type="button" class="link" data-pk="reset">この 伝票の チェックを やり直す</button></div></div>';
   }
@@ -1744,7 +1786,7 @@
   function pickScan(c, id, key) {
     var code = c + "-" + id;
     if (!key && !$("slipAsk").classList.contains("hidden")) { beep(false); return; }   // 選ぶ 画面が 出て いる 間は 読まない
-    if (!$("handAsk").classList.contains("hidden") || !$("rowList").classList.contains("hidden")) { beep(false); return; }
+    if (!$("handAsk").classList.contains("hidden") || !$("rowList").classList.contains("hidden") || !$("qtyAsk").classList.contains("hidden")) { beep(false); return; }
     if (popHold) { beep(false); var pc = $("pop").querySelector(".pop-card"); pc.classList.remove("shake"); void pc.offsetWidth; pc.classList.add("shake"); return; }
     if (!pk.slips) { pickMsg("bad", code, "伝票を 読み込み中です — 少し 待って もう一度"); beep(false); renderPick(); return; }
     var s = key ? openSlip(key) : (pk.open && slipByKey(pk.open));
@@ -1769,12 +1811,89 @@
     }
     var had = slipLines(s)[l.id];
     if (had) { pickMsg("warn", code, "もう チェック 済みです（" + (had.by ? had.by + " " : "") + inTxt(l.nyukoDate) + l.name + "）", l.id); beep(false); renderPick(); return; }
+    if (QTY_CONFIRM && needOf(l) > 0) { tone(880, 0, 0.1); renderPick(); openQty(s, l, false); return; }   // 数を 数えてから ✓
     var old = olderLots(s, l);
     queuePick(s, l.id, true, false);
     pickMsg(old.length ? "warn" : "ok", code, "✓ " + popLines(l.nyukoDate, l.name, l.qty + " " + unitOf(c, l.id)) +
       (old.length ? " — ⚠ もっと 古い ロット " + old[0].number + "（" + inDay(old[0].nyukoDate) + "・" + (old[0].location || "場所なし") + "）が あります" : ""), l.id);
     beep(true); renderPick();
   }
+  // ══ 数の 確認（2026-11-13）— ラベルが 合ったら パレットごとに 数える。合計が 伝票の 数に なったら ✓ ══
+  //   10 以上 = 段 × 1段の 数 ＋ バラ、10 より 少ない = 数だけ。足りない 時は 記録して、次の パレットを もう一度 スキャン。
+  var QTY_CONFIRM = true;   // false = 前の 流れ（スキャン → すぐ ✓）
+  var PAL_KEY = "nishiki_scan_pal", pal = {}, qa = null;
+  try { pal = JSON.parse(lsGet(PAL_KEY) || "{}") || {}; } catch (e) { pal = {}; }
+  function palKey(s, id) { return pk.date + "|" + s.key + "|" + id; }
+  function palOf(s, id) { return pal[palKey(s, id)] || []; }
+  function palSum(s, id) { return palOf(s, id).reduce(function (a, p) { return a + p.n; }, 0); }
+  function palClear(s, id) { delete pal[palKey(s, id)]; lsSet(PAL_KEY, JSON.stringify(pal)); }
+  function palTxt(p) { return p.d ? p.d + "段 × " + p.p + (p.b ? " ＋ " + p.b : "") + " ＝ " + p.n : String(p.n); }
+  function needOf(l) { var n = parseFloat(l.qty); return n > 0 && n === Math.floor(n) ? n : 0; }
+  function openQty(s, l, hand) {
+    var left = needOf(l) - palSum(s, l.id);
+    qa = { key: s.key, id: l.id, hand: !!hand, left: left, dan: left >= 10, v: { d: "", p: "", b: "", n: "" }, f: left >= 10 ? "d" : "n" };
+    var u = unitOf(s.c, l.id), old = olderLots(s, l), done = palOf(s, l.id);
+    $("qaCode").textContent = s.c + "-" + l.id + (hand ? "（手 — QR なし）" : "");
+    $("qaT").textContent = inTxt(l.nyukoDate) + l.name;
+    $("qaNeed").innerHTML = "<small>" + (done.length ? "あと" : "取る 数") + "</small><b>" + left + "</b><span>" + esc(u) + "</span>" + (done.length ? "<em>（伝票 " + esc(l.qty) + "）</em>" : "");
+    $("qaS").textContent = (l.loc || "場所なし") + "・" + (s.tantou || s.hikitori || "") +
+      (old.length ? " — ⚠ もっと 古い ロット " + old[0].number + "（" + inDay(old[0].nyukoDate) + "・" + (old[0].location || "場所なし") + "）が あります" : "");
+    $("qaDone").innerHTML = done.map(function (p, i) { return "<div>パレット " + (i + 1) + "：" + esc(palTxt(p)) + "</div>"; }).join("");
+    $("qaP").textContent = "パレット " + (done.length + 1);
+    $("qaKeys").innerHTML = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "次 ›", "0", "⌫"].map(function (k) {
+      return '<button type="button" data-k="' + k + '"' + (k.length > 1 || k === "⌫" ? ' class="fn"' : "") + ">" + k + "</button>"; }).join("");
+    $("qtyAsk").classList.remove("hidden");
+    drawQty();
+  }
+  function qtyTotal() {
+    var v = qa.v, n = function (x) { return parseInt(x, 10) || 0; };
+    return qa.dan ? n(v.d) * n(v.p) + n(v.b) : n(v.n);
+  }
+  function drawQty() {
+    var v = qa.v, s = slipByKey(qa.key), u = s ? unitOf(s.c, qa.id) : "", t = qtyTotal(), left = qa.left;
+    var bx = function (k, lb) { return '<button type="button" class="bx' + (qa.f === k ? " on" : "") + '" data-f="' + k + '"><small>' + lb + "</small><b>" + esc(v[k]) + "</b></button>"; };
+    $("qaMode").textContent = qa.dan ? "数だけ 入れる" : "段で 数える";
+    $("qaF").innerHTML = qa.dan ? bx("d", "段") + '<span class="op">×</span>' + bx("p", "1段の 数") + '<span class="op">＋</span>' + bx("b", "バラ")
+                                : bx("n", "数（" + esc(u || "個") + "）");
+    $("qaKeys").querySelector('[data-k="次 ›"]').style.visibility = qa.dan ? "" : "hidden";
+    var r = $("qaR"), go = $("qaGo");
+    if (!t) { r.className = "qa-r"; r.textContent = "数えて 入れて ください"; }
+    else if (t === left) { r.className = "qa-r ok"; r.textContent = "＝ " + t + " " + u + "　✓ ぴったり"; }
+    else if (t < left) { r.className = "qa-r less"; r.textContent = "＝ " + t + " " + u + "　あと " + (left - t) + " — 次の パレットへ"; }
+    else { r.className = "qa-r over"; r.textContent = "＝ " + t + " " + u + "　✕ " + (t - left) + " 多い"; }
+    go.disabled = !t || t > left;
+    go.textContent = t && t < left ? "記録して 次の パレット" : "✓ 記録";
+  }
+  $("qaF").addEventListener("click", function (e) { var b = e.target.closest("[data-f]"); if (b && qa) { qa.f = b.getAttribute("data-f"); drawQty(); } });
+  $("qaMode").addEventListener("click", function () { if (!qa) return; qa.dan = !qa.dan; qa.v = { d: "", p: "", b: "", n: "" }; qa.f = qa.dan ? "d" : "n"; drawQty(); });
+  $("qaKeys").addEventListener("click", function (e) {
+    var b = e.target.closest("[data-k]"); if (!b || !qa) return;
+    var k = b.getAttribute("data-k"), v = qa.v, f = qa.f;
+    if (k === "⌫") v[f] = v[f].slice(0, -1);
+    else if (k.length > 1) { if (qa.dan) qa.f = f === "d" ? "p" : f === "p" ? "b" : "d"; }
+    else if (v[f].length < 4 && !(k === "0" && !v[f])) v[f] += k;
+    drawQty();
+  });
+  $("qaNo").addEventListener("click", function () { qa = null; $("qtyAsk").classList.add("hidden"); focusScan(); });
+  $("qaGo").addEventListener("click", function () {
+    if (!qa) return;
+    var s = slipByKey(qa.key), t = qtyTotal(), q = qa, n = function (x) { return parseInt(x, 10) || 0; };
+    $("qtyAsk").classList.add("hidden"); qa = null;
+    var l = s && s.lines.filter(function (x) { return x.id === q.id; })[0];
+    if (!s || !l || shipped(s) || slipLines(s)[q.id] || !t || t > q.left) { renderPick(); focusScan(); return; }
+    var k = palKey(s, q.id), list = pal[k] || (pal[k] = []);
+    list.push(q.dan ? { d: n(q.v.d), p: n(q.v.p), b: n(q.v.b), n: t } : { n: t });
+    lsSet(PAL_KEY, JSON.stringify(pal));
+    var u = unitOf(s.c, q.id), code = s.c + "-" + q.id;
+    if (t === q.left) {
+      queuePick(s, q.id, true, q.hand); beep(true);
+      pickMsg("ok", code, "✓ " + popLines(l.nyukoDate, l.name, l.qty + " " + u + (q.hand ? "（手）" : "")), q.id);
+    } else {
+      tone(660, 0, 0.12);
+      pickMsg("ok", code, "パレット " + list.length + " 記録\n" + popLines(l.nyukoDate, l.name, "あと " + (q.left - t) + " " + u) + " — 次の パレットを スキャン", q.id);
+    }
+    renderPick(); focusScan();
+  });
 
   // ══ 同じ 列（棚）・きょうの 合計・手チェック（2026-11-12）══
   //   列 = 5・6・7 は 部屋＋文字（7A・5R'）、8 は 2けた（81〜87）
@@ -1874,10 +1993,13 @@
       var on = slipLines(s);
       if (!Object.keys(on).length || !confirm("この 伝票の チェックを 全部 消して やり直しますか？（ほかの スマホ・PC からも 消えます）")) return;
       Object.keys(on).forEach(function (id) { queuePick(s, id, false, true); });
+      s.lines.forEach(function (x) { palClear(s, x.id); });
       pk.msg = null; renderPick();
     } else if (b.hasAttribute("data-line") && s) {   // ラベルが 読めない 時は 手で
       var id = b.getAttribute("data-line"), d = slipLines(s)[id];
-      if (d) { if (!confirm(id + " の チェックを 外しますか？")) return; queuePick(s, id, false, true); }
+      var hl = s.lines.filter(function (x) { return x.id === id; })[0];
+      if (d) { if (!confirm(id + " の チェックを 外しますか？")) return; queuePick(s, id, false, true); palClear(s, id); }
+      else if (QTY_CONFIRM && hl && needOf(hl) > 0) { openQty(s, hl, true); return; }
       else if (HAND_CONFIRM) { askHand(s, id); return; }
       else { if (!confirm(id + " を 手で チェック しますか？（ラベルが 読めない 時だけ）")) return; queuePick(s, id, true, true); }
       pk.msg = null; renderPick();
@@ -2393,7 +2515,7 @@
 
   // ── 新しい 版が 出ていたら 読み直す（ホーム画面の アプリは 古い 版を しばらく 覚えている）──
   // 開いた 時だけ（カメラを 開いた 後に 読み直すと また 許可を 聞くので）。同じ 版へは 1回だけ（ループ しない）。
-  var VERSION = "2026-11-16c";
+  var VERSION = "2026-11-16d";
   $("verLbl").textContent = "版 " + VERSION;
   function checkUpdate() {
     if (!window.fetch) return;
