@@ -317,6 +317,12 @@
   .pk-tabs button.on b { color: #2f6b5a; }
   .pk-tabs button.hot b { color: #b3261e; }
   .pk-tabs button.zero b { color: #1d7a4a; }
+  .pk-sort { display: flex; align-items: center; gap: 6px; margin: 4px 0 2px; font-size: 13px; font-weight: 700; color: #6b7b75; }
+  .pk-sort button { padding: 6px 12px; border-radius: 10px; border: 1px solid #c9d8d3; background: #fff; font-family: inherit; font-size: 14px; font-weight: 700; color: #2c3a35; cursor: pointer; }
+  .pk-sort button.on { background: #2c3a35; color: #fff; border-color: #2c3a35; }
+  .bi-gh { margin: 14px 0 2px; padding: 7px 10px; border-radius: 10px; background: #eef4ff; color: #1f3f8f; font-size: 16px; font-weight: 800; display: flex; justify-content: space-between; gap: 8px; }
+  .bi-gh span { font-size: 13px; font-weight: 700; color: #4a5f8f; white-space: nowrap; }
+  .bi-gh.bi-hide { display: none; }
   .pk-lbl { margin: 14px 0 4px; font-size: 13px; font-weight: 800; color: #6b7b75; }
   .pk-card { display: block; width: 100%; text-align: left; background: #fff; border: 1px solid #d9e4e0; border-radius: 14px; padding: 12px; margin: 8px 0; font-family: inherit; color: inherit; }
   .pk-card h3 { margin: 0; font-size: 16px; line-height: 1.35; }
@@ -1740,7 +1746,7 @@
     var bf = $("biFind");
     if (bf) { bf.value = biQ; if (hadFind) { try { bf.focus({ preventScroll: true }); bf.setSelectionRange(biQ.length, biQ.length); } catch (e) {} } biFilter(); }
   }
-  var pkTab = "take", pkCl = "", pkFind = false;
+  var pkTab = "take", pkCl = "", pkFind = false, pkSort = lsGet("nishiki_scan_pksort") === "grp" ? "grp" : "loc";
   function pkSlipsAll() { return pk.slips || []; }
   function pkCounts() {   // ① のこりの 品物 ② 積み込み 待ち ③ 済み
     var take = {}, load = 0, done = 0, byC = {};
@@ -1775,7 +1781,9 @@
     var list = slips.filter(function (s) { return !pkCl || s.c === pkCl; });
     var body = itemListHtml(list);
     if (!n.take && slips.length) body = '<div class="pk-empty2"><b>✓</b>ぜんぶ 取りました — ② 積む へ</div>' + body;
-    return chips + find + body;
+    var sortRow = slips.length ? '<div class="pk-sort">並び <button type="button" data-sort="loc" class="' + (pkSort === "loc" ? "on" : "") + '">📍 場所順</button>' +
+      '<button type="button" data-sort="grp" class="' + (pkSort === "grp" ? "on" : "") + '">👤 担当・引取先ごと</button></div>' : "";
+    return chips + sortRow + find + body;
   }
   function pkLoadHtml() {
     var todo = pkSlipsAll().filter(function (s) { return !shipped(s); });
@@ -1846,7 +1854,9 @@
       var C = cMap[s.c]; if (!C) { C = cMap[s.c] = { c: s.c, client: s.client, items: [], iMap: {} }; byC.push(C); }
       var m = slipLines(s);
       s.lines.forEach(function (l) {
-        var it = C.iMap[l.id]; if (!it) { it = C.iMap[l.id] = { l: l, need: 0, got: 0, slips: [] }; C.items.push(it); }
+        var gk = pkSort === "grp" ? grpOf(s) : "", ik = gk + "\u0001" + l.id;
+        var it = C.iMap[ik]; if (!it) { it = C.iMap[ik] = { l: l, g: gk, gt: s.time || "", need: 0, got: 0, slips: [] }; C.items.push(it); }
+        if ((s.time || "") < it.gt) it.gt = s.time || "";
         var q = parseFloat(l.qty) > 0 ? parseFloat(l.qty) : 0, d = m[l.id], ps = palSum(s, l.id);
         it.need += q; it.got += d ? q : Math.min(ps, q);
         it.slips.push({ s: s, q: l.qty, ok: !!d, ps: ps });
@@ -1858,18 +1868,25 @@
     return "" +
       byC.map(function (C, i) { return { C: C, i: i, d: C.items.every(biDone) ? 1 : 0 }; })
         .sort(function (a, b) { return (a.d - b.d) || (a.i - b.i); }).map(function (o) {
-        var C = o.C;
+        var C = o.C, gOrd = {}, gLeft = {};   // グループの 順 = いちばん 早い 時間
+        C.items.forEach(function (it) { if (!(it.g in gOrd) || it.gt < gOrd[it.g]) gOrd[it.g] = it.gt; if (!biDone(it)) gLeft[it.g] = (gLeft[it.g] || 0) + 1; });
+        var gNow = null;
         var items = C.items.map(function (it, i) { return { it: it, i: i }; }).sort(function (a, b) {
           var da = biDone(a.it) ? 1 : 0, db = biDone(b.it) ? 1 : 0;
           if (da !== db) return da - db;
+          if (pkSort === "grp" && !da && a.it.g !== b.it.g) { var ga = gOrd[a.it.g], gb = gOrd[b.it.g]; return ga < gb ? -1 : ga > gb ? 1 : a.it.g < b.it.g ? -1 : 1; }
           var x = locKey(a.it.l.loc), y = locKey(b.it.l.loc); return x < y ? -1 : x > y ? 1 : a.i - b.i; }).map(function (o2) { return o2.it; });
         var left = items.filter(function (it) { return !it.slips.every(function (x) { return x.ok; }); }).length, room = null;
         return '<div class="pk-g"><b>' + esc(C.client) + "</b><span>のこり " + left + " / " + items.length + "</span></div>" +
           items.map(function (it) {
-            var l = it.l, u = unitOf(C.c, l.id), k = C.c + "|" + l.id, open = !!biOpen[k];
+            var l = it.l, u = unitOf(C.c, l.id), k = C.c + "|" + l.id + (pkSort === "grp" ? "|" + it.g : ""), open = !!biOpen[k];
             var ok = it.slips.every(function (x) { return x.ok; }), part = !ok && it.slips.some(function (x) { return x.ok || x.ps; });
             var loc = l.loc || "場所なし", head = ok ? (room !== "#done" ? '<div class="bi-rm bi-dn">✓ 済み ' + (items.length - left) + "</div>" : "")
                                                     : (loc !== room ? '<div class="bi-rm">' + esc(loc) + "</div>" : "");
+            if (pkSort === "grp" && !ok && it.g !== gNow) {
+              head = '<div class="bi-gh">' + esc((it.g || "（" + grpLabel(C.c) + " なし）")) + "<span>" + esc(grpLabel(C.c)) + " ・ のこり " + gLeft[it.g] + "</span></div>" + '<div class="bi-rm">' + esc(loc) + "</div>";
+              gNow = it.g;
+            }
             room = ok ? "#done" : loc;
             var dup = function (x) { return it.slips.filter(function (y) { return grpOf(y.s) === grpOf(x.s); }).length > 1; };
             var who = it.slips.map(function (x) { return grpOf(x.s); }).filter(function (v, i, a) { return v && a.indexOf(v) === i; });
@@ -1900,28 +1917,29 @@
     return t.toLowerCase().replace(/[\u3041-\u3096]/g, function (c) { return String.fromCharCode(c.charCodeAt(0) + 96); }).replace(/\s+/g, "");
   }
   function biFilter() {
-    var box = $("pickList"), q = String(biQ || "").split(/[\s\u3000]+/).map(biNorm).filter(Boolean), g = null, rm = null, any = false, gAny = false, rAny = false;
+    var box = $("pickList"), q = String(biQ || "").split(/[\s\u3000]+/).map(biNorm).filter(Boolean), g = null, rm = null, gh = null, hAny = false, any = false, gAny = false, rAny = false;
     if (!box) return;
     var close = function () { if (rm) rm.classList.toggle("bi-hide", !rAny); };
     Array.prototype.forEach.call(box.children, function (el) {
       var cl = el.classList;
-      if (cl.contains("pk-g")) { close(); rm = null; if (g) g.classList.toggle("bi-hide", !gAny); g = el; gAny = false; }
+      if (cl.contains("pk-g")) { close(); rm = null; if (gh) gh.classList.toggle("bi-hide", !hAny); gh = null; if (g) g.classList.toggle("bi-hide", !gAny); g = el; gAny = false; }
+      else if (cl.contains("bi-gh")) { close(); rm = null; if (gh) gh.classList.toggle("bi-hide", !hAny); gh = el; hAny = false; }
       else if (cl.contains("bi-rm")) { close(); rm = el; rAny = false; }
       else if (cl.contains("bi") && el.hasAttribute("data-s")) {
         var ds = el.getAttribute("data-s"), hit = q.every(function (w) { return ds.indexOf(w) >= 0; });
         cl.toggle("bi-hide", !hit);
-        if (hit) { any = true; gAny = true; rAny = true; }
+        if (hit) { any = true; gAny = true; rAny = true; hAny = true; }
       }
     });
-    close(); if (g) g.classList.toggle("bi-hide", !gAny);
+    close(); if (gh) gh.classList.toggle("bi-hide", !hAny); if (g) g.classList.toggle("bi-hide", !gAny);
     var none = $("biNone"); if (none) none.classList.toggle("bi-hide", any || !q.length);
   }
   // 品物を タップ → まだ ✓ の 無い 伝票を 時刻の 順に、数の 確認を 続けて 出す
   var biChain = null;
   function biGo(k) {
-    var i = k.indexOf("|"), c = k.slice(0, i), id = k.slice(i + 1);
+    var p = k.split("|"), c = p[0], id = p[1], g = p.length > 2 ? p.slice(2).join("|") : null;
     var list = (pk.slips || []).filter(function (s) {
-      return s.c === c && !shipped(s) && !slipLines(s)[id] && s.lines.some(function (l) { return l.id === id; }); });
+      return s.c === c && (g === null || grpOf(s) === g) && !shipped(s) && !slipLines(s)[id] && s.lines.some(function (l) { return l.id === id; }); });
     if (!list.length) { biOpen[k] = !biOpen[k]; renderPick(); return; }
     biChain = { id: id, list: list.map(function (s) { return s.key; }), total: list.length };
     biNext();
@@ -2250,6 +2268,8 @@
   });
   $("pkCamBtn").addEventListener("click", function () { $("camBtn").click(); });
   $("pickView").addEventListener("click", function (e) {
+    var bso = e.target.closest("[data-sort]");
+    if (bso) { pkSort = bso.getAttribute("data-sort"); lsSet("nishiki_scan_pksort", pkSort); biOpen = {}; renderPick(); return; }
     var bc = e.target.closest("[data-cl]");
     if (bc) { pkCl = bc.getAttribute("data-cl"); renderPick(); window.scrollTo(0, 0); return; }
     var bs = e.target.closest("[data-ship]");
@@ -2819,7 +2839,7 @@
 
   // ── 新しい 版が 出ていたら 読み直す（ホーム画面の アプリは 古い 版を しばらく 覚えている）──
   // 開いた 時だけ（カメラを 開いた 後に 読み直すと また 許可を 聞くので）。同じ 版へは 1回だけ（ループ しない）。
-  var VERSION = "2026-11-16h";
+  var VERSION = "2026-11-16i";
   $("verLbl").textContent = "版 " + VERSION;
   function checkUpdate() {
     if (!window.fetch) return;
