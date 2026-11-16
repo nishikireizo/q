@@ -288,7 +288,59 @@
   .pk-view { display: flex; margin: 10px 0 4px; border: 1px solid #c9d8d3; border-radius: 12px; overflow: hidden; background: #fff; }
   .pk-view button { flex: 1; border: none; background: none; padding: 10px 6px; font-weight: 700; font-size: 15px; font-family: inherit; color: #4b5d57; cursor: pointer; }
   .pk-view button.on { background: #2f6b5a; color: #fff; }
-  .bi-toast { position: fixed; left: 12px; right: 12px; bottom: 22px; z-index: 60; pointer-events: none; background: #1d7a4a; color: #fff; border-radius: 14px; padding: 12px 16px;
+  /* ── 出庫の 新しい 形（2026-11-16）── */
+  #vMain.pk-mode .scanrow { position: absolute; left: -9999px; top: 0; width: 1px; height: 1px; overflow: hidden; }
+  #vMain.pk-mode .wv-side .sec { padding: 0 16px; }
+  #vMain.pk-mode .wv-side .sec .msg:empty { display: none; }
+  #vMain.pk-mode .wrap, #vMain.pk-mode { padding-bottom: 86px; }
+  #vMain.pk-mode #mnPill { display: none; }
+  #vMain.pk-mode #mnUser { display: none; }
+  #vMain.pk-mode #mnTitle { font-size: 17px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #vMain.pk-mode .bar > div[style] { flex: 1; }
+  .pk-tb { display: flex; gap: 4px; flex: none; }
+  @media (max-width: 420px) { #vMain.pk-mode .bar { padding-left: 10px; padding-right: 10px; } #vMain.pk-mode #mnTitle { font-size: 16px; } }
+  .pk-tb.hidden { display: none; }
+  .pk-tb button { width: 34px; height: 40px; padding: 0; border-radius: 10px; font-size: 18px; }
+  .pk-tb button.on { background: #2f6b5a; color: #fff; border-color: #2f6b5a; }
+  .pk-chips { display: flex; gap: 6px; overflow-x: auto; padding: 8px 0 4px; margin: 0 -2px; -webkit-overflow-scrolling: touch; }
+  .pk-chips button { flex: none; white-space: nowrap; padding: 7px 12px; border-radius: 999px; border: 1px solid #c9d8d3; background: #fff; font-family: inherit; font-size: 14px; font-weight: 700; color: #2c3a35; cursor: pointer; }
+  .pk-chips button i { font-style: normal; margin-left: 6px; padding: 0 7px; border-radius: 999px; background: #fff3d6; color: #7a5d00; font-size: 13px; }
+  .pk-chips button.on { background: #2f6b5a; color: #fff; border-color: #2f6b5a; }
+  .pk-chips button.on i { background: rgba(255,255,255,.25); color: #fff; }
+  .pk-chips button.zero i { background: #dff2e7; color: #1d7a4a; }
+  .pk-tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; display: grid; grid-template-columns: repeat(3, 1fr); background: #fff; border-top: 1px solid #d9e4e0;
+    padding-bottom: env(safe-area-inset-bottom); box-shadow: 0 -4px 14px rgba(0,0,0,.06); }
+  .pk-tabs.hidden { display: none; }
+  .pk-tabs button { border: none; background: none; padding: 7px 4px 9px; font-family: inherit; font-size: 13px; font-weight: 700; color: #6b7b75; cursor: pointer; border-radius: 0; }
+  .pk-tabs button b { display: block; font-size: 22px; line-height: 1.15; color: #1f2b27; }
+  .pk-tabs button.on { color: #2f6b5a; box-shadow: inset 0 3px 0 #2f6b5a; background: #f1f7f5; }
+  .pk-tabs button.on b { color: #2f6b5a; }
+  .pk-tabs button.hot b { color: #b3261e; }
+  .pk-tabs button.zero b { color: #1d7a4a; }
+  .pk-lbl { margin: 14px 0 4px; font-size: 13px; font-weight: 800; color: #6b7b75; }
+  .pk-card { display: block; width: 100%; text-align: left; background: #fff; border: 1px solid #d9e4e0; border-radius: 14px; padding: 12px; margin: 8px 0; font-family: inherit; color: inherit; }
+  .pk-card h3 { margin: 0; font-size: 16px; line-height: 1.35; }
+  .pk-card .cs { font-size: 13px; color: #6b7b75; margin: 2px 0 6px; }
+  .pk-card ul { margin: 0 0 10px; padding: 0; list-style: none; font-size: 14px; }
+  .pk-card li { display: flex; justify-content: space-between; gap: 8px; padding: 4px 0; border-bottom: 1px dotted #cfdcd7; }
+  .pk-card li small { color: #6b7b75; }
+  .pk-card .cst { font-size: 14px; font-weight: 700; color: #7a5d00; }
+  .pk-card.wait { cursor: pointer; }
+  .pk-card.ready { border: 2px solid #1d7a4a; }
+  .pk-card .ship { display: block; width: 100%; border: none; border-radius: 12px; background: #1d5f8a; color: #fff; font-family: inherit; font-size: 18px; font-weight: 800; padding: 13px; cursor: pointer; }
+  .pk-card .crow { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 8px; }
+  .pk-card .lnk { border: none; background: none; padding: 4px 0; font-family: inherit; font-size: 14px; font-weight: 700; color: #1f4fbf; cursor: pointer; }
+  .pk-card.done h3 { color: #1d7a4a; }
+  .pk-empty2 { padding: 28px 10px; text-align: center; color: #6b7b75; font-size: 15px; }
+  .pk-empty2 b { display: block; font-size: 40px; margin-bottom: 6px; }
+  /* 確認は 下から（パレットで 数える 所は たたむ）*/
+  #vMain.pk-mode #qtyAsk { align-items: flex-end; padding: 0; }
+  #vMain.pk-mode .qty-card { width: 100%; max-width: 620px; border-radius: 22px 22px 0 0; padding: 16px 16px calc(16px + env(safe-area-inset-bottom)); max-height: 94vh; }
+  #vMain.pk-mode #qtyAsk .pop-t { font-size: 20px; margin-top: 4px; }
+  #qtyAsk.fold #qaMore, #qtyAsk.fold #qaGo { display: none; }
+  #qtyAsk.fold .pop-btns { grid-template-columns: 1fr; }
+  .qa-fold { display: block; width: 100%; margin-top: 10px; border: 1px dashed #b9cbc4; border-radius: 12px; background: #f7fbfa; padding: 10px; font-family: inherit; font-size: 15px; font-weight: 700; color: #1f4fbf; cursor: pointer; }
+  .bi-toast { position: fixed; left: 12px; right: 12px; bottom: 92px; z-index: 60; pointer-events: none; background: #1d7a4a; color: #fff; border-radius: 14px; padding: 12px 16px;
     font-size: 16px; font-weight: 800; line-height: 1.4; white-space: pre-line; box-shadow: 0 6px 20px rgba(0,0,0,.25); text-align: center; }
   .bi-toast.hidden { display: none; }
   .bi-rm.bi-dn { margin-top: 18px; color: #1d7a4a; border-bottom-color: #8cc5a8; }
@@ -537,6 +589,7 @@
         <div style="min-width:0"><div class="title" id="mnTitle">メニュー</div><div class="sub" id="mnUser"></div></div>
       </div>
       <span class="pill off hidden" id="mnPill">タップで スキャン待ち</span>
+      <div class="pk-tb hidden" id="pkTb"><button type="button" id="pkPrev" aria-label="前の日">‹</button><button type="button" id="pkNext" aria-label="次の日">›</button><button type="button" id="pkFindBtn" aria-label="探す">🔍</button><button type="button" id="pkCamBtn" aria-label="カメラ">📷</button></div>
     </div>
     <!-- メニュー -->
     <div id="homeView">
@@ -581,6 +634,7 @@
       <div id="recentBox"><div class="recent-h" id="recentH"></div><div id="recent"></div></div>
     </div>
     <div id="pickView" class="hidden"><div id="pickList"></div><div id="pickSlip"></div></div>
+    <div class="pk-tabs hidden" id="pkTabs"></div>
     </div>
     <!-- スキャン結果（出庫）: ✓ は 1秒ちょっとで 消える。✕・⚠ は OK を 押すまで 残る（その 間の スキャンは 受けない）-->
     <div id="biToast" class="bi-toast hidden" role="status" aria-live="polite"></div>
@@ -604,11 +658,14 @@
     <div id="qtyAsk" class="pop ask hidden" role="dialog">
       <div class="pop-card qty-card"><div class="qa-code" id="qaCode"></div><div class="pop-t" id="qaT"></div><div class="pop-s" id="qaS"></div>
         <div class="qa-who" id="qaWho"></div><div class="qa-need" id="qaNeed"></div><div class="qa-done" id="qaDone"></div>
-        <button type="button" class="qa-all" id="qaAll"></button><div class="qa-or">パレットごとに 数える 時は 下で</div>
+        <button type="button" class="qa-all" id="qaAll"></button>
+        <button type="button" class="qa-fold" id="qaFold">パレットで 数える（段 × 数）▾</button>
+        <div id="qaMore">
         <div class="qa-h"><b id="qaP"></b><button type="button" class="link" id="qaMode"></button></div>
         <div class="qa-f" id="qaF"></div>
         <div class="qa-r" id="qaR"></div>
         <div class="qa-keys" id="qaKeys"></div>
+        </div>
         <div class="pop-btns"><button type="button" id="qaNo">やめる</button><button type="button" class="go" id="qaGo"></button></div></div>
     </div>
     <div id="rowList" class="pop ask hidden" role="dialog">
@@ -1491,6 +1548,10 @@
     $("lookupView").classList.toggle("hidden", m !== "lookup");
     $("clientBar").classList.toggle("hidden", m !== "lookup");
     $("pickView").classList.toggle("hidden", m !== "shukko");
+    $("vMain").classList.toggle("pk-mode", m === "shukko");
+    $("pkTb").classList.toggle("hidden", m !== "shukko");
+    $("pkTabs").classList.toggle("hidden", m !== "shukko");
+    if (m === "shukko") { pkTab = "take"; pk.open = ""; }
     $("backBtn").classList.toggle("hidden", m === "home");
     $("mnPill").classList.toggle("hidden", m === "home");
     $("mnTitle").textContent = MODE_TITLE[m] || "";
@@ -1679,7 +1740,85 @@
     var bf = $("biFind");
     if (bf) { bf.value = biQ; if (hadFind) { try { bf.focus({ preventScroll: true }); bf.setSelectionRange(biQ.length, biQ.length); } catch (e) {} } biFilter(); }
   }
+  var pkTab = "take", pkCl = "", pkFind = false;
+  function pkSlipsAll() { return pk.slips || []; }
+  function pkCounts() {   // ① のこりの 品物 ② 積み込み 待ち ③ 済み
+    var take = {}, load = 0, done = 0, byC = {};
+    pkSlipsAll().forEach(function (s) {
+      if (shipped(s)) { done++; return; }
+      var m = slipLines(s), full = true;
+      s.lines.forEach(function (l) { if (!m[l.id]) { full = false; take[s.c + "|" + l.id] = 1; } });
+      if (full) load++;
+      byC[s.c] = byC[s.c] || { c: s.c, client: s.client, n: 0 };
+    });
+    Object.keys(take).forEach(function (k) { var c = k.slice(0, k.indexOf("|")); if (byC[c]) byC[c].n++; });
+    var cl = Object.keys(byC).map(function (c) { return byC[c]; }).sort(function (a, b) { return Number(a.c) - Number(b.c); });
+    return { take: Object.keys(take).length, load: load, done: done, clients: cl };
+  }
+  function pkShortName(s) { return String(s.client || "").replace(/^\d+\.\s*/, ""); }
+  function pkWho(s) { return [grpOf(s), s.time].filter(Boolean).join(" "); }
+  function pkTabsHtml(n) {
+    var t = function (k, num, lb, cls) { return '<button type="button" data-tab="' + k + '" class="' + (pkTab === k ? "on " : "") + (cls || "") + '"><b>' + num + "</b>" + lb + "</button>"; };
+    return t("take", n.take, "① 取る", n.take ? "" : "zero") + t("load", n.load, "② 積む", n.load ? "hot" : "") + t("done", n.done, "③ 済み", "");
+  }
+  function pkTopHtml() {   // お知らせ・未送信・読み込み
+    return alertHtml() + qNote() + (pk.loading ? '<div class="hint">読み込み中…</div>' : pk.err ? '<div class="hint err">読めませんでした: ' + esc(pk.err) + ' <button type="button" class="link" data-pk="reload">↻ もう一度</button></div>' : "");
+  }
+  function pkTakeHtml(n) {
+    var slips = pkSlipsAll(), cl = n.clients;
+    if (pkCl && !cl.some(function (x) { return x.c === pkCl; })) pkCl = "";
+    var chips = cl.length > 1 ? '<div class="pk-chips"><button type="button" data-cl="" class="' + (pkCl ? "" : "on") + '">ぜんぶ<i>' + n.take + "</i></button>" +
+      cl.map(function (x) { return '<button type="button" data-cl="' + esc(x.c) + '" class="' + (pkCl === x.c ? "on" : "") + (x.n ? "" : " zero") + '">' + esc(x.c + " " + pkShortName(x)) + "<i>" + (x.n || "✓") + "</i></button>"; }).join("") + "</div>" : "";
+    var find = (pkFind || biQ) ? '<div class="bi-find"><input type="search" id="biFind" placeholder="🔍 品名・品番・場所・担当" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="search">' +
+        '<button type="button" data-bi-x="1" aria-label="消す">✕</button></div>' : "";
+    if (!pk.loading && !pk.err && !slips.length) return '<div class="pk-empty2"><b>📭</b>この 日の 出庫は ありません</div>';
+    var list = slips.filter(function (s) { return !pkCl || s.c === pkCl; });
+    var body = itemListHtml(list);
+    if (!n.take && slips.length) body = '<div class="pk-empty2"><b>✓</b>ぜんぶ 取りました — ② 積む へ</div>' + body;
+    return chips + find + body;
+  }
+  function pkLoadHtml() {
+    var todo = pkSlipsAll().filter(function (s) { return !shipped(s); });
+    if (!todo.length) return '<div class="pk-empty2"><b>🚚</b>積む 伝票は ありません</div>';
+    var full = todo.filter(function (s) { return slipCount(s) === s.lines.length; }), part = todo.filter(function (s) { return slipCount(s) < s.lines.length; });
+    var lines = function (s) { return "<ul>" + s.lines.map(function (l) { return "<li><span>" + esc(l.name) + " <small>" + esc(inDay(l.nyukoDate) || "") + "</small></span><b>" + esc(l.qty + " " + unitOf(s.c, l.id)) + "</b></li>"; }).join("") + "</ul>"; };
+    return '<div class="pk-lbl">積み込み 待ち ' + full.length + "</div>" +
+      (full.length ? full.map(function (s) {
+        return '<div class="pk-card ready"><h3>' + esc(s.client) + (grpOf(s) ? " — " + esc(grpOf(s)) : "") + "</h3>" +
+          '<div class="cs">' + esc([s.time, s.hikitori, s.unso, s.tantou].filter(Boolean).join(" ・ ")) + " ・ " + s.lines.length + " 行</div>" + lines(s) +
+          '<button type="button" class="ship" data-ship="' + esc(s.key) + '">🚚 トラックに 積んだ</button>' +
+          '<div class="crow"><span></span><button type="button" class="lnk" data-slip="' + esc(s.key) + '">伝票を 開く ›</button></div></div>';
+      }).join("") : '<div class="hint">まだ ありません — ぜんぶ 取った 伝票が ここに 来ます</div>') +
+      (part.length ? '<div class="pk-lbl">まだ 取って いる ' + part.length + "</div>" + part.map(function (s) {
+        var m = slipLines(s), left = s.lines.filter(function (l) { return !m[l.id]; });
+        return '<button type="button" class="pk-card wait" data-slip="' + esc(s.key) + '"><h3>' + esc(s.client) + (grpOf(s) ? " — " + esc(grpOf(s)) : "") + "</h3>" +
+          '<div class="cs">' + esc([s.time, s.hikitori, s.unso].filter(Boolean).join(" ・ ")) + "</div>" +
+          '<div class="cst">' + slipCount(s) + " / " + s.lines.length + " 行 — あと " + esc(left.slice(0, 2).map(function (l) { return l.name; }).join("、")) + (left.length > 2 ? " ほか " + (left.length - 2) : "") + "</div></button>";
+      }).join("") : "");
+  }
+  function pkDoneHtml() {
+    var done = pkSlipsAll().filter(function (s) { return shipped(s); });
+    if (!done.length) return '<div class="pk-empty2"><b>🕒</b>まだ 出庫 済みの 伝票は ありません</div>';
+    return done.map(function (s) {
+      var sh = shipped(s);
+      return '<div class="pk-card done"><h3>🚚 ' + esc(s.client) + (grpOf(s) ? " — " + esc(grpOf(s)) : "") + "</h3>" +
+        '<div class="cs">' + (sh.at ? hhmm(sh.at) + " 出庫" : "出庫") + (sh.by ? " ・ " + esc(sh.by) : "") + (sh.wait ? " ・ 未送信" : "") + " ・ " + s.lines.length + " 行 ・ " + esc(s.time || "") + "</div>" +
+        '<div class="crow"><button type="button" class="lnk" data-slip="' + esc(s.key) + '">伝票を 開く ›</button><button type="button" class="lnk" data-unship="' + esc(s.key) + '">取り消す</button></div></div>';
+    }).join("");
+  }
   function renderPick0() {
+    if (pkTab === "take") pk.open = "";   // ① では 伝票を 開かない（スキャンの 中では その まま 使う）
+    var s = pk.open && slipByKey(pk.open), n = pkCounts();
+    $("mnTitle").textContent = dayLabel(pk.date).replace(/ *今日/, "").replace(/^\d\d\//, "");
+    $("pickView").classList.toggle("open", !!s);
+    $("pkTabs").innerHTML = pkTabsHtml(n);
+    $("pkFindBtn").classList.toggle("on", !!(pkFind || biQ));
+    $("pkFindBtn").style.visibility = pkTab === "take" ? "" : "hidden";
+    $("pickList").innerHTML = pkTopHtml() + (pkTab === "take" ? pkTakeHtml(n) : pkTab === "load" ? pkLoadHtml() : pkDoneHtml());
+    if (s) renderSlip(s);
+    else $("pickSlip").innerHTML = '<div class="pk-empty"><b>←</b>伝票を えらぶ と ここに 出ます</div>';
+  }
+  function renderPickOld() {
     var s = pk.open && slipByKey(pk.open);
     $("mnTitle").textContent = s ? "出庫 ピッキング" : "出庫";
     $("pickView").classList.toggle("open", !!s);
@@ -1716,10 +1855,7 @@
     if (!byC.length) return '<div class="hint">のこりの 伝票は ありません（🚚 出庫済み だけ）</div>';
     var allN = 0, leftN = 0;
     byC.forEach(function (C) { C.items.forEach(function (it) { allN++; if (!it.slips.every(function (x) { return x.ok; })) leftN++; }); });
-    return '<div class="bi-find"><input type="search" id="biFind" placeholder="🔍 品名・品番・場所・得意先" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="search">' +
-        '<button type="button" data-bi-x="1" aria-label="消す">✕</button></div>' +
-      '<div class="bi-left' + (leftN ? "" : " done") + '">' + (leftN ? "のこり " + leftN + " 品 / " + allN : "✓ ぜんぶ チェック済み（" + allN + " 品）") + "</div>" +
-      '<div class="pk-hint">品物を タップ → 数を 確かめて ✓（QR が 無くても OK）。ラベルを スキャンしても 同じ</div>' +
+    return "" +
       byC.map(function (C, i) { return { C: C, i: i, d: C.items.every(biDone) ? 1 : 0 }; })
         .sort(function (a, b) { return (a.d - b.d) || (a.i - b.i); }).map(function (o) {
         var C = o.C;
@@ -1958,8 +2094,11 @@
     $("qaP").textContent = "パレット " + (done.length + 1);
     $("qaKeys").innerHTML = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "次 ›", "0", "⌫"].map(function (k) {
       return '<button type="button" data-k="' + k + '"' + (k.length > 1 || k === "⌫" ? ' class="fn"' : "") + ">" + k + "</button>"; }).join("");
-    $("qaAll").textContent = "✓ " + (done.length ? "のこり " : "伝票どおり ") + left + " " + u + " 取った";
+    $("qaAll").textContent = "✓ " + (done.length ? "のこり " : "") + left + " " + u + " 取った";
     $("qaWho").textContent = biChain ? [grpOf(s), s.time].filter(Boolean).join(" ") + (biChain.total > 1 ? "　伝票 " + (biChain.total - biChain.list.length + 1) + " / " + biChain.total : "") : "";
+    var fold = !done.length && lsGet("nishiki_scan_fold") !== "0";   // 前に 開いて 使った 人は 開いた まま
+    $("qtyAsk").classList.toggle("fold", fold);
+    $("qaFold").textContent = fold ? "パレットで 数える（段 × 数）▾" : "▴ たたむ";
     $("qtyAsk").classList.remove("hidden");
     drawQty();
   }
@@ -1993,6 +2132,11 @@
     drawQty();
   });
   $("qaNo").addEventListener("click", function () { qa = null; biChain = null; $("qtyAsk").classList.add("hidden"); focusScan(); });
+  $("qaFold").addEventListener("click", function () {
+    var fold = !$("qtyAsk").classList.contains("fold");
+    $("qtyAsk").classList.toggle("fold", fold); lsSet("nishiki_scan_fold", fold ? "1" : "0");
+    $("qaFold").textContent = fold ? "パレットで 数える（段 × 数）▾" : "▴ たたむ";
+  });
   $("qaAll").addEventListener("click", function () {   // 伝票どおり — 1タップ（パレットは 1つ として 記録）
     if (!qa) return;
     qa.dan = false; qa.v = { d: "", p: "", b: "", n: String(qa.left) }; qa.f = "n";
@@ -2012,11 +2156,11 @@
     var u = unitOf(s.c, q.id), code = s.c + "-" + q.id;
     if (t === q.left) {
       queuePick(s, q.id, true, q.hand); beep(true);
-      if (q.hand) { pk.msg = { kind: "ok", code: code, text: "✓ " + l.name + " " + l.qty + " " + u + "（手）", line: q.id }; biToast("✓ " + popLines(l.nyukoDate, l.name, l.qty + " " + u)); }
+      if (q.hand || true) { pk.msg = { kind: "ok", code: code, text: "✓ " + l.name + " " + l.qty + " " + u + "（手）", line: q.id }; biToast("✓ " + popLines(l.nyukoDate, l.name, l.qty + " " + u)); }
       else pickMsg("ok", code, "✓ " + popLines(l.nyukoDate, l.name, l.qty + " " + u), q.id);
     } else {
       tone(660, 0, 0.12);
-      if (q.hand) { pk.msg = { kind: "ok", code: code, text: "パレット " + list.length + " 記録 — あと " + (q.left - t) + " " + u, line: q.id }; biToast("パレット " + list.length + " 記録\n" + l.name + "\nあと " + (q.left - t) + " " + u); }
+      if (q.hand || true) { pk.msg = { kind: "ok", code: code, text: "パレット " + list.length + " 記録 — あと " + (q.left - t) + " " + u, line: q.id }; biToast("パレット " + list.length + " 記録\n" + l.name + "\nあと " + (q.left - t) + " " + u); }
       else pickMsg("ok", code, "パレット " + list.length + " 記録\n" + popLines(l.nyukoDate, l.name, "あと " + (q.left - t) + " " + u) + " — 次の パレットを スキャン", q.id);
     }
     renderPick(); focusScan();
@@ -2094,8 +2238,38 @@
     renderPick(); focusScan();
   });
 
+  $("pkTabs").addEventListener("click", function (e) {
+    var b = e.target.closest("[data-tab]"); if (!b) return;
+    pkTab = b.getAttribute("data-tab"); pk.open = ""; pk.msg = null; renderPick(); window.scrollTo(0, 0); focusScan();
+  });
+  $("pkPrev").addEventListener("click", function () { pk.date = dayShift(pk.date, -1); pk.open = ""; pk.msg = null; pkCl = ""; loadSlips(); });
+  $("pkNext").addEventListener("click", function () { pk.date = dayShift(pk.date, 1); pk.open = ""; pk.msg = null; pkCl = ""; loadSlips(); });
+  $("pkFindBtn").addEventListener("click", function () {
+    if (pkFind || biQ) { pkFind = false; biQ = ""; renderPick(); focusScan(); return; }
+    pkFind = true; renderPick(); var bf = $("biFind"); if (bf) bf.focus();
+  });
+  $("pkCamBtn").addEventListener("click", function () { $("camBtn").click(); });
   $("pickView").addEventListener("click", function (e) {
-    if (e.target.closest("[data-bi-x]")) { biQ = ""; renderPick(); return; }
+    var bc = e.target.closest("[data-cl]");
+    if (bc) { pkCl = bc.getAttribute("data-cl"); renderPick(); window.scrollTo(0, 0); return; }
+    var bs = e.target.closest("[data-ship]");
+    if (bs) {   // 🚚 積んだ — 1タップ（まちがい は ③ で 取り消す）
+      var ss = slipByKey(bs.getAttribute("data-ship"));
+      if (ss && !shipped(ss) && slipCount(ss) === ss.lines.length) {
+        queuePick(ss, "🚚", true, true); beep(true); biToast("🚚 出庫 確定\n" + ss.client + " " + (ss.time || ""));
+        renderPick();
+      }
+      return;
+    }
+    var bu = e.target.closest("[data-unship]");
+    if (bu) {
+      var su = slipByKey(bu.getAttribute("data-unship"));
+      if (su && confirm("出庫 確定を 取り消しますか？（② 積む に 戻ります）\n" + su.client + " " + (su.time || ""))) { queuePick(su, "🚚", false, true); renderPick(); }
+      return;
+    }
+    var bo = e.target.closest("[data-slip]");
+    if (bo && pkTab === "take") { pkTab = "load"; }   // ① から 伝票を 開く → ② で 見る
+    if (e.target.closest("[data-bi-x]")) { pkFind = false; biQ = ""; renderPick(); return; }
     var bg = e.target.closest("[data-bi-go]");
     if (bg) { biGo(bg.getAttribute("data-bi-go")); return; }
     var bh = e.target.closest("[data-bi]");
@@ -2186,7 +2360,7 @@
   $("shipGo").addEventListener("click", function () {
     var s = slipByKey($("shipAsk").dataset.key || ""); $("shipAsk").classList.add("hidden");
     if (s && !shipped(s)) {   // 確定したら 伝票の 一覧へ 戻る（次の 伝票へ・2026-11-12）
-      queuePick(s, "🚚", true, true); pk.open = ""; beep(true);
+      queuePick(s, "🚚", true, true); pk.open = ""; beep(true); if (pkTab === "take") pkTab = "load";
       pickMsg("ok", "", "🚚 出庫 確定 — " + s.client + " " + (s.time || ""));
       renderPick(); window.scrollTo(0, 0);
     }
@@ -2645,7 +2819,7 @@
 
   // ── 新しい 版が 出ていたら 読み直す（ホーム画面の アプリは 古い 版を しばらく 覚えている）──
   // 開いた 時だけ（カメラを 開いた 後に 読み直すと また 許可を 聞くので）。同じ 版へは 1回だけ（ループ しない）。
-  var VERSION = "2026-11-16g";
+  var VERSION = "2026-11-16h";
   $("verLbl").textContent = "版 " + VERSION;
   function checkUpdate() {
     if (!window.fetch) return;
