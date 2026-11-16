@@ -458,6 +458,9 @@
     <div class="bar"><div class="title">スキャン</div></div>
     <div class="sec"><div class="box">
       <b>セットアップ用 QR から 開いてください</b>
+      <button type="button" class="big" id="setupCamBtn" style="display:block;width:100%;margin:12px 0 4px;padding:14px;font-size:17px;font-weight:800;border-radius:14px;border:none;background:#2f6b5a;color:#fff">📷 セットアップ用 QR を 読む</button>
+      <p class="sub" style="font-size:13px;margin:0 0 10px">ホーム画面の アイコンから 開いた 時は ここで 読んで ください（iPhone は Safari と 別に 覚えます）</p>
+      <div id="setupCamSlot"></div>
       <p class="sub" style="font-size:14px">PC の メニュー「スキャン画面（スマホ）」に 出る QR を スマホの カメラで 読む。<br>iPhone: Safari で 開く → 共有 → ホーム画面に追加<br>Android: Chrome で 開く → ⋮ → ホーム画面に追加（アプリを インストール）</p>
     </div></div>
   </div>
@@ -1248,7 +1251,17 @@
     return { bad: s };
   }
 
+  function setupFrom(raw) {   // セットアップ用 QR の 中の d=…
+    var m = String(raw || "").match(/[?&]d=(AKfyc[A-Za-z0-9_-]{20,120})/);
+    if (!m || !D_RE.test(m[1])) return false;
+    if (m[1] === dep && token) return false;   // もう その 設定
+    lsSet(K.d, m[1]);
+    location.replace(location.pathname + "?d=" + encodeURIComponent(m[1]));
+    return true;
+  }
   function handle(raw) {
+    if (setupFrom(raw)) return;
+    if (!API) { $("camMsg").textContent = "これは セットアップ用 QR では ありません"; beep(false); return; }
     if (window.LocPad && LocPad.isOpen()) return;   // 場所の 入力中
     if (!$("busy").classList.contains("hidden")) return;   // 保存中
     var p = parseCode(raw);
@@ -2380,7 +2393,7 @@
 
   // ── 新しい 版が 出ていたら 読み直す（ホーム画面の アプリは 古い 版を しばらく 覚えている）──
   // 開いた 時だけ（カメラを 開いた 後に 読み直すと また 許可を 聞くので）。同じ 版へは 1回だけ（ループ しない）。
-  var VERSION = "2026-11-16b";
+  var VERSION = "2026-11-16c";
   $("verLbl").textContent = "版 " + VERSION;
   function checkUpdate() {
     if (!window.fetch) return;
@@ -2396,6 +2409,13 @@
       }).catch(function () {});
   }
   checkUpdate();
+
+  $("setupCamBtn").addEventListener("click", function () {
+    try { unlockAudio(); } catch (e) {}
+    $("setupCamSlot").appendChild($("scanErr")); $("setupCamSlot").appendChild($("cam"));
+    camRetried = false;
+    openCam();
+  });
 
   // ── はじめ ──
   if (!API) show("vSetup");
