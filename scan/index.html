@@ -288,6 +288,10 @@
   .pk-view { display: flex; margin: 10px 0 4px; border: 1px solid #c9d8d3; border-radius: 12px; overflow: hidden; background: #fff; }
   .pk-view button { flex: 1; border: none; background: none; padding: 10px 6px; font-weight: 700; font-size: 15px; font-family: inherit; color: #4b5d57; cursor: pointer; }
   .pk-view button.on { background: #2f6b5a; color: #fff; }
+  .bi-toast { position: fixed; left: 12px; right: 12px; bottom: 22px; z-index: 60; pointer-events: none; background: #1d7a4a; color: #fff; border-radius: 14px; padding: 12px 16px;
+    font-size: 16px; font-weight: 800; line-height: 1.4; white-space: pre-line; box-shadow: 0 6px 20px rgba(0,0,0,.25); text-align: center; }
+  .bi-toast.hidden { display: none; }
+  .bi-rm.bi-dn { margin-top: 18px; color: #1d7a4a; border-bottom-color: #8cc5a8; }
   .bi-find { display: flex; gap: 6px; margin: 8px 0 6px; }
   .bi-find input { flex: 1; min-width: 0; height: 46px; border: 2px solid #c9d8d3; border-radius: 12px; padding: 0 12px; font-size: 17px; font-family: inherit; background: #fff; color: inherit; }
   .bi-find input:focus { border-color: #2f6b5a; outline: none; }
@@ -579,6 +583,7 @@
     <div id="pickView" class="hidden"><div id="pickList"></div><div id="pickSlip"></div></div>
     </div>
     <!-- スキャン結果（出庫）: ✓ は 1秒ちょっとで 消える。✕・⚠ は OK を 押すまで 残る（その 間の スキャンは 受けない）-->
+    <div id="biToast" class="bi-toast hidden" role="status" aria-live="polite"></div>
     <div id="busy" class="pop hidden" role="status" aria-live="polite">
       <div class="pop-card busy-card"><div class="spin"></div><div class="pop-t" id="busyT">保存中…</div></div>
     </div>
@@ -1715,14 +1720,21 @@
         '<button type="button" data-bi-x="1" aria-label="消す">✕</button></div>' +
       '<div class="bi-left' + (leftN ? "" : " done") + '">' + (leftN ? "のこり " + leftN + " 品 / " + allN : "✓ ぜんぶ チェック済み（" + allN + " 品）") + "</div>" +
       '<div class="pk-hint">品物を タップ → 数を 確かめて ✓（QR が 無くても OK）。ラベルを スキャンしても 同じ</div>' +
-      byC.map(function (C) {
-        var items = C.items.slice().sort(function (a, b) { var x = locKey(a.l.loc), y = locKey(b.l.loc); return x < y ? -1 : x > y ? 1 : 0; });
+      byC.map(function (C, i) { return { C: C, i: i, d: C.items.every(biDone) ? 1 : 0 }; })
+        .sort(function (a, b) { return (a.d - b.d) || (a.i - b.i); }).map(function (o) {
+        var C = o.C;
+        var items = C.items.map(function (it, i) { return { it: it, i: i }; }).sort(function (a, b) {
+          var da = biDone(a.it) ? 1 : 0, db = biDone(b.it) ? 1 : 0;
+          if (da !== db) return da - db;
+          var x = locKey(a.it.l.loc), y = locKey(b.it.l.loc); return x < y ? -1 : x > y ? 1 : a.i - b.i; }).map(function (o2) { return o2.it; });
         var left = items.filter(function (it) { return !it.slips.every(function (x) { return x.ok; }); }).length, room = null;
         return '<div class="pk-g"><b>' + esc(C.client) + "</b><span>のこり " + left + " / " + items.length + "</span></div>" +
           items.map(function (it) {
             var l = it.l, u = unitOf(C.c, l.id), k = C.c + "|" + l.id, open = !!biOpen[k];
             var ok = it.slips.every(function (x) { return x.ok; }), part = !ok && it.slips.some(function (x) { return x.ok || x.ps; });
-            var loc = l.loc || "場所なし", head = loc !== room ? '<div class="bi-rm">' + esc(loc) + "</div>" : ""; room = loc;
+            var loc = l.loc || "場所なし", head = ok ? (room !== "#done" ? '<div class="bi-rm bi-dn">✓ 済み ' + (items.length - left) + "</div>" : "")
+                                                    : (loc !== room ? '<div class="bi-rm">' + esc(loc) + "</div>" : "");
+            room = ok ? "#done" : loc;
             var dup = function (x) { return it.slips.filter(function (y) { return grpOf(y.s) === grpOf(x.s); }).length > 1; };
             var who = it.slips.map(function (x) { return grpOf(x.s); }).filter(function (v, i, a) { return v && a.indexOf(v) === i; });
             var txt = biNorm([l.name, l.id, loc, C.client, inDay(l.nyukoDate)].concat(who).join(" "));
@@ -1738,6 +1750,12 @@
               }).join("") + "</div>" : "") + "</div>";
           }).join("");
       }).join("") + '<div class="bi-none bi-hide" id="biNone">見つかりません</div>';
+  }
+  function biDone(it) { return it.slips.every(function (x) { return x.ok; }); }
+  var biToastT = null;
+  function biToast(t) {   // 画面を ふさがない お知らせ — 次の 品物を すぐ 押せる
+    var el = $("biToast"); el.textContent = t; el.classList.remove("hidden");
+    clearTimeout(biToastT); biToastT = setTimeout(function () { el.classList.add("hidden"); }, 1800);
   }
   // 探す — かな・カナ、全角・半角、空白は 気にしない
   var biQ = "";
@@ -1994,10 +2012,12 @@
     var u = unitOf(s.c, q.id), code = s.c + "-" + q.id;
     if (t === q.left) {
       queuePick(s, q.id, true, q.hand); beep(true);
-      pickMsg("ok", code, "✓ " + popLines(l.nyukoDate, l.name, l.qty + " " + u + (q.hand ? "（手）" : "")), q.id);
+      if (q.hand) { pk.msg = { kind: "ok", code: code, text: "✓ " + l.name + " " + l.qty + " " + u + "（手）", line: q.id }; biToast("✓ " + popLines(l.nyukoDate, l.name, l.qty + " " + u)); }
+      else pickMsg("ok", code, "✓ " + popLines(l.nyukoDate, l.name, l.qty + " " + u), q.id);
     } else {
       tone(660, 0, 0.12);
-      pickMsg("ok", code, "パレット " + list.length + " 記録\n" + popLines(l.nyukoDate, l.name, "あと " + (q.left - t) + " " + u) + " — 次の パレットを スキャン", q.id);
+      if (q.hand) { pk.msg = { kind: "ok", code: code, text: "パレット " + list.length + " 記録 — あと " + (q.left - t) + " " + u, line: q.id }; biToast("パレット " + list.length + " 記録\n" + l.name + "\nあと " + (q.left - t) + " " + u); }
+      else pickMsg("ok", code, "パレット " + list.length + " 記録\n" + popLines(l.nyukoDate, l.name, "あと " + (q.left - t) + " " + u) + " — 次の パレットを スキャン", q.id);
     }
     renderPick(); focusScan();
   });
@@ -2625,7 +2645,7 @@
 
   // ── 新しい 版が 出ていたら 読み直す（ホーム画面の アプリは 古い 版を しばらく 覚えている）──
   // 開いた 時だけ（カメラを 開いた 後に 読み直すと また 許可を 聞くので）。同じ 版へは 1回だけ（ループ しない）。
-  var VERSION = "2026-11-16f";
+  var VERSION = "2026-11-16g";
   $("verLbl").textContent = "版 " + VERSION;
   function checkUpdate() {
     if (!window.fetch) return;
