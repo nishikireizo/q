@@ -594,6 +594,7 @@
         <button type="button" class="backbtn hidden" id="backBtn" aria-label="もどる">←</button>
         <div style="min-width:0"><div class="title" id="mnTitle">メニュー</div><div class="sub" id="mnUser"></div></div>
       </div>
+      <button type="button" id="scanRef" class="hidden" aria-label="読み直す" style="padding:6px 9px">↻</button>
       <span class="pill off hidden" id="mnPill">タップで スキャン待ち</span>
       <div class="pk-tb hidden" id="pkTb"><button type="button" id="pkPrev" aria-label="前の日">‹</button><button type="button" id="pkNext" aria-label="次の日">›</button><button type="button" id="pkFindBtn" aria-label="探す">🔍</button><button type="button" id="pkCamBtn" aria-label="カメラ">📷</button></div>
     </div>
@@ -1556,6 +1557,7 @@
     $("pickView").classList.toggle("hidden", m !== "shukko");
     $("vMain").classList.toggle("pk-mode", m === "shukko");
     $("pkTb").classList.toggle("hidden", m !== "shukko");
+    $("scanRef").classList.toggle("hidden", m !== "shukko" && m !== "lookup");
     $("pkTabs").classList.toggle("hidden", m !== "shukko");
     if (m === "shukko") { pkTab = "take"; pk.open = ""; }
     $("backBtn").classList.toggle("hidden", m === "home");
@@ -1666,7 +1668,7 @@
   function pickEnter() {
     if (!pk.slips || pk.loadedDate !== pk.date) loadSlips(); else { renderPick(); refreshPicks(); }
     clearInterval(pk.timer);
-    pk.timer = setInterval(function () { if (mode === "shukko" && !document.hidden) { refreshPicks(); flushQ(); } }, 20000);
+    flushQ();   // 20秒ごとの 読み直しは やめた（電池・2026-11-18）— 戻った時・↻・スキャンの時だけ読む
   }
   // 古い 返事で 新しい ✓ を 消さない: 読み始めた 後に ✓ を 送った / 送って いる 時は その 返事の ✓ は 使わない
   function freshPicks(date, v) { return pk.serverDate !== date || (pk.ver === v && !pk.sending && !pickQ.length); }
@@ -1693,6 +1695,28 @@
     apiGet({ api: "picks", date: date }).then(function (j) {
       if (date !== pk.date || !freshPicks(date, v)) return;
       pk.server = j.picks || {}; pk.serverDate = date; palFromServer(date, j.pals); renderPick();
+    }).catch(function () {});
+  }
+  // 伝票の 一覧を 静かに 読み直す（戻った 時・↻・スキャンの 時だけ。20秒ごとの 読み直しは 電池のため やめた）— PC で 出庫（伝票）が できた 時に 出る。変わった 時だけ 描き直す
+  function slipSig(list) {
+    return list.map(function (s) { return s.key + "#" + s.lines.map(function (l) { return l.id + ":" + l.qty; }).join(","); }).join("|");
+  }
+  function softSlips() {
+    if (mode !== "shukko" || document.hidden || pk.open || pk.loading || pk.sending || pickQ.length) return;
+    var date = pk.date;
+    apiGet({ api: "shukko", date: date }).then(function (j) {
+      if (date !== pk.date || mode !== "shukko" || pk.open || pk.loading || pk.sending || pickQ.length) return;
+      var next = (j.slips || []).map(function (s) {
+        s.c = String(s.c); s.lines = (s.lines || []).filter(function (l) { return Number(l.qty) > 0; });
+        s.lines.forEach(function (l) { l.id = String(l.id); });
+        return s;
+      }).filter(function (s) { return s.lines.length; })
+        .sort(function (a, b) { return a.time < b.time ? -1 : a.time > b.time ? 1 : Number(a.c) - Number(b.c); });
+      if (!pk.slips || slipSig(next) === slipSig(pk.slips)) return;
+      var added = next.length - pk.slips.length;
+      pk.slips = next; pk.loadedDate = date;
+      if (added > 0) biToast("新しい 伝票が " + added + " 件 入りました（出庫）");
+      renderPick();
     }).catch(function () {});
   }
   // 貯めた ✓ を 順に 送る
@@ -2262,6 +2286,10 @@
   });
   $("pkPrev").addEventListener("click", function () { pk.date = dayShift(pk.date, -1); pk.open = ""; pk.msg = null; pkCl = ""; loadSlips(); });
   $("pkNext").addEventListener("click", function () { pk.date = dayShift(pk.date, 1); pk.open = ""; pk.msg = null; pkCl = ""; loadSlips(); });
+  $("scanRef").addEventListener("click", function () {
+    if (mode === "lookup") { $("mnReload").click(); return; }
+    if (mode === "shukko") { pk.msg = null; loadSlips(); refreshPicks(); }
+  });
   $("pkFindBtn").addEventListener("click", function () {
     if (pkFind || biQ) { pkFind = false; biQ = ""; renderPick(); focusScan(); return; }
     pkFind = true; renderPick(); var bf = $("biFind"); if (bf) bf.focus();
@@ -2831,6 +2859,7 @@
     if (camStream) camOffTimer = setTimeout(dropCam, CAM_KEEP_MS);
   }
   $("camClose").addEventListener("click", function () { closeCam(); });
+  document.addEventListener("visibilitychange", function () { if (!document.hidden && mode === "shukko") { softSlips(); refreshPicks(); } });
   // ほかの アプリに 行って 戻った 時: 開いていた カメラは 開き直す（動かなければ 見張りが 新しく 開く）
   document.addEventListener("visibilitychange", function () {
     if (document.hidden) { camWasOpen = camShown(); if (camWasOpen) closeCam(); }
@@ -2839,7 +2868,8 @@
 
   // ── 新しい 版が 出ていたら 読み直す（ホーム画面の アプリは 古い 版を しばらく 覚えている）──
   // 開いた 時だけ（カメラを 開いた 後に 読み直すと また 許可を 聞くので）。同じ 版へは 1回だけ（ループ しない）。
-  var VERSION = "2026-11-16i";
+  window.addEventListener("online", function () { flushQ(); });   // 電波が 戻った時 — 貯めた ✓ を 送る
+  var VERSION = "2026-11-18b";
   $("verLbl").textContent = "版 " + VERSION;
   function checkUpdate() {
     if (!window.fetch) return;
