@@ -349,6 +349,24 @@
   .bi-toast { position: fixed; left: 12px; right: 12px; bottom: 92px; z-index: 60; pointer-events: none; background: #1d7a4a; color: #fff; border-radius: 14px; padding: 12px 16px;
     font-size: 16px; font-weight: 800; line-height: 1.4; white-space: pre-line; box-shadow: 0 6px 20px rgba(0,0,0,.25); text-align: center; }
   .bi-toast.hidden { display: none; }
+  /* 147: 取った 後・画面の 中の お知らせ・予約の 中身 */
+  .qa-after { margin-top: 6px; font-size: 15px; font-weight: 700; color: #2f6b57; }
+  .qa-after b { font-size: 24px; font-weight: 800; margin: 0 2px; }
+  .qa-after:empty { display: none; }
+  .nt-bar { position: fixed; left: 10px; right: 10px; top: 10px; z-index: 45; max-width: 520px; margin: 0 auto; background: #fff; border: 1px solid #e0b038; border-radius: 16px;
+            box-shadow: 0 8px 20px rgba(0,0,0,.14); padding: 10px 12px; display: flex; gap: 10px; align-items: center; }
+  .nt-bar.hidden { display: none; }
+  .nt-ic { width: 34px; height: 34px; border-radius: 50%; background: #fbf1d4; display: flex; align-items: center; justify-content: center; font-size: 17px; flex: none; }
+  .nt-t { flex: 1; min-width: 0; } .nt-t b { display: block; font-size: 14px; } .nt-t small { color: #6e8a84; font-size: 12px; }
+  .nt-go { background: #2f6b57; color: #fff; border-color: #2f6b57; font-weight: 700; padding: 6px 12px; font-size: 13px; }
+  .nt-x { border: 0; background: none; color: #6e8a84; font-size: 18px; padding: 0 4px; }
+  .nt-new { display: inline-block; background: #2f6b57; color: #fff; font-size: 10px; font-weight: 700; border-radius: 6px; padding: 1px 6px; margin-left: 6px; vertical-align: middle; }
+  .yoyaku.tap { width: 100%; text-align: left; cursor: pointer; font: inherit; color: inherit; }
+  .yy-more { font-size: 12px; font-weight: 700; color: var(--amber); white-space: nowrap; }
+  .yy-row { border: 1px solid var(--border); border-radius: 12px; padding: 8px 12px; margin-bottom: 8px; }
+  .yy-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .yy-q { font: 700 18px var(--mono); color: var(--amber); }
+  .yy-sub { font-size: 13px; color: var(--text-2); } .yy-sub.dim { color: var(--muted); font-size: 12px; }
   .bi-rm.bi-dn { margin-top: 18px; color: #1d7a4a; border-bottom-color: #8cc5a8; }
   .bi-find { display: flex; gap: 6px; margin: 8px 0 6px; }
   .bi-find input { flex: 1; min-width: 0; height: 46px; border: 2px solid #c9d8d3; border-radius: 12px; padding: 0 12px; font-size: 17px; font-family: inherit; background: #fff; color: inherit; }
@@ -664,7 +682,7 @@
     </div>
     <div id="qtyAsk" class="pop ask hidden" role="dialog">
       <div class="pop-card qty-card"><div class="qa-code" id="qaCode"></div><div class="pop-t" id="qaT"></div><div class="pop-s" id="qaS"></div>
-        <div class="qa-who" id="qaWho"></div><div class="qa-need" id="qaNeed"></div><div class="qa-done" id="qaDone"></div>
+        <div class="qa-who" id="qaWho"></div><div class="qa-need" id="qaNeed"></div><div class="qa-after" id="qaAfter"></div><div class="qa-done" id="qaDone"></div>
         <button type="button" class="qa-all" id="qaAll"></button>
         <button type="button" class="qa-fold" id="qaFold">パレットで 数える（段 × 数）▾</button>
         <div id="qaMore">
@@ -674,6 +692,14 @@
         <div class="qa-keys" id="qaKeys"></div>
         </div>
         <div class="pop-btns"><button type="button" id="qaNo">やめる</button><button type="button" class="go" id="qaGo"></button></div></div>
+    </div>
+    <div id="ntBar" class="nt-bar hidden" role="status" aria-live="polite"><div class="nt-ic">🔔</div>
+      <div class="nt-t"><b>新しい出庫が入りました</b><small id="ntSub"></small></div>
+      <button type="button" class="nt-go" id="ntGo">見る</button><button type="button" class="nt-x" id="ntX" aria-label="閉じる">×</button></div>
+    <div id="yyAsk" class="pop ask hidden" role="dialog">
+      <div class="pop-card"><div class="pop-t" id="yyT">予約</div><div class="pop-s" id="yyS"></div>
+        <div class="rl-list" id="yyL"></div>
+        <div class="pop-btns"><button type="button" id="yyX">閉じる</button></div></div>
     </div>
     <div id="rowList" class="pop ask hidden" role="dialog">
       <div class="pop-card"><div class="pop-t" id="rowListT"></div><div class="pop-s">同じ 得意先の きょうの 伝票（出庫済みは 除く）</div>
@@ -1320,13 +1346,15 @@
   // 入力を いつも スキャン待ちに（iPhone は タップの 中でしか focus できない）
   var scanIn = $("scanIn");
   function focusScan() { try { scanIn.focus({ preventScroll: true }); } catch (e) { scanIn.focus(); } }
-  function pill() {
-    var on = document.activeElement === scanIn;
+  function pill() {   // 入力欄の 外でも スキャナーは 読む（下の gBuf）。ほかの 入力欄・打つ モードの 時だけ「タップで」
+    var a = document.activeElement;
+    var on = a === scanIn || (!kbMode && !(a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)));
     $("mnPill").className = "pill " + (on ? "on" : "off");
     $("mnPill").textContent = on ? "スキャン待ち" : "タップで スキャン待ち";
   }
   scanIn.addEventListener("focus", pill);
   scanIn.addEventListener("blur", function () { setTimeout(pill, 0); });
+  document.addEventListener("focusout", function () { setTimeout(pill, 0); });   // 🔍 探す などから 出た 時も
   $("vMain").addEventListener("click", function (e) {
     unlockAudio();
     if (e.target.closest("button, a, input")) return;
@@ -1353,6 +1381,26 @@
     idleTimer = setTimeout(function () { if (looksComplete(scanIn.value)) take(); }, 300);
   });
   function take() { var v = scanIn.value; scanIn.value = ""; if (v.trim()) handle(v); }
+
+  // スキャナーの 文字が 入力欄の 外に 来た 時も 読む（2026-11-18・古い ラベルの アドレス QR も すぐ）
+  //  iPhone は 別の アプリから 戻った 時などに 入力欄から 外れ、タップ しないと 戻せない。その 間も ここで 読む。
+  //  入力欄（🔍 探す・打つ・数・場所）に いる 時は 何も しない（その 欄が 読む）。
+  var gBuf = "", gTimer = null;
+  function gTake() { clearTimeout(gTimer); var v = gBuf; gBuf = ""; if (v.trim()) handle(v); }
+  document.addEventListener("keydown", function (e) {
+    var t = e.target, tag = t && t.tagName;
+    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || (t && t.isContentEditable)) return;
+    if ($("vMain").classList.contains("hidden") || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.key === "Enter") { if (gBuf) { e.preventDefault(); gTake(); focusScan(); } return; }
+    if (!e.key || e.key.length !== 1 || (e.key === " " && !gBuf)) return;
+    e.preventDefault();
+    gBuf += e.key;
+    clearTimeout(gTimer);
+    gTimer = setTimeout(function () {
+      if (looksComplete(gBuf)) gTake();
+      else gTimer = setTimeout(function () { gBuf = ""; }, 1500);   // 途中で 止まった 文字は 捨てる
+    }, 300);
+  });
 
   function normalize(s) {
     return String(s || "")
@@ -1438,7 +1486,7 @@
           cell("現在在庫", real + (it.nishikata ? " " + it.nishikata : "")) + cell("荷姿", it.nishikata) +
         "</div>" +
         '<div class="sec-head">予約状況</div>' +
-        (y > 0 ? '<div class="yoyaku"><div><div class="yk">予約あり</div><div class="yn">×' + esc(y) + '</div></div><div class="sub">出庫予定数（在庫数は 引いた 数）</div></div>'
+        (y > 0 ? '<button type="button" class="yoyaku tap" id="yyOpen"><div><div class="yk">予約あり</div><div class="yn">×' + esc(y) + '</div></div><div class="sub">出庫予定数（在庫数は 引いた 数）</div><span class="yy-more">中身 ›</span></button>'
                : '<div class="empty-msg">予約なし</div>') +
         '<div class="pane-foot"><button type="button" class="refresh-btn" id="refreshBtn">↻ データ更新</button>' +
           '<button type="button" class="refresh-btn" id="openPage">🏷 ラベル印刷</button></div>' +
@@ -1472,6 +1520,7 @@
     var c = card.getAttribute("data-c"), id = card.getAttribute("data-id");
     if (b.hasAttribute("data-tab")) setTab(b.getAttribute("data-tab"));
     else if (b.id === "locEdit") openLocEdit(c, id);
+    else if (b.id === "yyOpen") openYoyaku(c, id);
     else if (b.id === "openPage") setTab("label");
     else if (b.id === "lblPrint") { shareOrPrintLabel(); return; }
     else if (b.hasAttribute("data-lst")) { lblStyle = b.getAttribute("data-lst"); drawLabel(c, id, cardItem); }
@@ -1567,6 +1616,7 @@
     if (m === "home") closeCam();
     hidePop();
     if (m === "shukko") pickEnter();
+    ntSync();
     if (m !== "home") focusScan();
     window.scrollTo(0, 0);
   }
@@ -1685,6 +1735,7 @@
         .sort(function (a, b) { return a.time < b.time ? -1 : a.time > b.time ? 1 : Number(a.c) - Number(b.c); });
       if (freshPicks(date, v)) { pk.server = j.picks || {}; pk.serverDate = date; palFromServer(date, j.pals); }
       pk.loadedDate = date;
+      if (j.nt !== undefined) { nt.topic = j.nt || ""; ntSync(); }   // 画面の 中の お知らせ（147）
       if (pk.open && !slipByKey(pk.open)) pk.open = "";
     }).catch(function (e) { if (my === pk.seq && !e.auth) pk.err = e.message || String(e); })
       .then(function () { if (my === pk.seq) { pk.loading = false; renderPick(); flushQ(); } });
@@ -1713,9 +1764,14 @@
       }).filter(function (s) { return s.lines.length; })
         .sort(function (a, b) { return a.time < b.time ? -1 : a.time > b.time ? 1 : Number(a.c) - Number(b.c); });
       if (!pk.slips || slipSig(next) === slipSig(pk.slips)) return;
+      if (j.nt !== undefined) { nt.topic = j.nt || ""; ntSync(); }
+      var had = {}; pk.slips.forEach(function (x) { had[x.key] = 1; });
+      var fresh = next.filter(function (x) { return !had[x.key]; });
+      fresh.forEach(function (x) { newKeys[x.key] = 1; });
       var added = next.length - pk.slips.length;
       pk.slips = next; pk.loadedDate = date;
-      if (added > 0) biToast("新しい 伝票が " + added + " 件 入りました（出庫）");
+      if (nt.shown) ntSubSet(fresh.length ? "伝票 " + fresh.length + " 件・一覧を 更新しました" : "一覧を 更新しました");
+      else if (added > 0) biToast("新しい 伝票が " + added + " 件 入りました（出庫）");
       renderPick();
     }).catch(function () {});
   }
@@ -1917,7 +1973,7 @@
             var txt = biNorm([l.name, l.id, loc, C.client, inDay(l.nyukoDate)].concat(who).join(" "));
             return head + '<div class="bi' + (ok ? " ok" : part ? " part" : "") + '" data-s="' + esc(txt) + '">' +
               '<button type="button" class="bi-h" data-bi-go="' + esc(k) + '"><span class="bi-ck">' + (ok ? "✓" : "") + "</span>" +
-                '<span class="bi-nm">' + esc(l.name) + "<small>" + esc(inDay(l.nyukoDate) || "—") + " 入庫 · " + esc(l.id) +
+                '<span class="bi-nm">' + esc(l.name) + (!ok && it.slips.some(function (x) { return newKeys && newKeys[x.s.key]; }) ? '<span class="nt-new">新</span>' : "") + "<small>" + esc(inDay(l.nyukoDate) || "—") + " 入庫 · " + esc(l.id) +
                   (it.slips.length === 1 && who.length ? " · " + esc(who[0]) : "") + "</small></span>" +
                 '<span class="bi-q">' + esc(String(part ? it.need - it.got : it.need)) + "<small>" + (part ? "のこり" : esc(u)) + "</small></span></button>" +
               (it.slips.length > 1 ? '<button type="button" class="bi-more" data-bi="' + esc(k) + '">伝票 ' + it.slips.length + " 枚（" + esc(who.join("・")) + "）" + (open ? " ▲" : " ▼") + "</button>" : "") +
@@ -2130,6 +2186,7 @@
     $("qaCode").textContent = s.c + "-" + l.id + (hand ? "（手 — QR なし）" : "");
     $("qaT").textContent = inTxt(l.nyukoDate) + l.name;
     $("qaNeed").innerHTML = "<small>" + (done.length ? "あと" : "取る 数") + "</small><b>" + left + "</b><span>" + esc(u) + "</span>" + (done.length ? "<em>（伝票 " + esc(l.qty) + "）</em>" : "");
+    $("qaAfter").innerHTML = l.after == null ? "" : "取った 後 <b>" + esc(l.after) + "</b> " + esc(u) + (Number(l.after) === 0 ? "（空に なります）" : "");   // 出庫の 最終在庫（147）
     $("qaS").textContent = (l.loc || "場所なし") + "・" + (s.tantou || s.hikitori || "") +
       (old.length ? " — ⚠ もっと 古い ロット " + old[0].number + "（" + inDay(old[0].nyukoDate) + "・" + (old[0].location || "場所なし") + "）が あります" : "");
     $("qaDone").innerHTML = done.map(function (p, i) { return "<div>パレット " + (i + 1) + "：" + esc(palTxt(p)) + "</div>"; }).join("");
@@ -2869,7 +2926,7 @@
   // ── 新しい 版が 出ていたら 読み直す（ホーム画面の アプリは 古い 版を しばらく 覚えている）──
   // 開いた 時だけ（カメラを 開いた 後に 読み直すと また 許可を 聞くので）。同じ 版へは 1回だけ（ループ しない）。
   window.addEventListener("online", function () { flushQ(); });   // 電波が 戻った時 — 貯めた ✓ を 送る
-  var VERSION = "2026-11-18b";
+  var VERSION = "2026-11-19a";
   $("verLbl").textContent = "版 " + VERSION;
   function checkUpdate() {
     if (!window.fetch) return;
@@ -2902,6 +2959,62 @@
     if (p && !p.bad && !p.noClient) { biQ = ""; e.target.value = ""; handle(p.c + "-" + p.id); }
     else e.target.blur();
   });
+
+  // ══ 画面の 中の 出庫お知らせ（147）— 出庫 画面を 開いて いる 間だけ ntfy を 聞く（定期的には 読まない）══
+  //   トピックは サーバーが 登録した 端末にだけ 返す（j.nt）。携帯の ntfy アプリと 同じ 知らせ。
+  var nt = { topic: "", es: null, shown: false }, newKeys = {};
+  function ntSubSet(t) { $("ntSub").textContent = hhmm(Date.now()) + "・" + t; }
+  function ntHide() { nt.shown = false; $("ntBar").classList.add("hidden"); }
+  function ntSync() {
+    if (mode !== "shukko") { ntHide(); newKeys = {}; }
+    var want = !!(nt.topic && mode === "shukko" && !document.hidden && window.EventSource);
+    if (want && !nt.es) {
+      try {
+        var es = new EventSource("https://ntfy.sh/" + encodeURIComponent(nt.topic) + "/sse");
+        es.onmessage = function (e) { var d = {}; try { d = JSON.parse(e.data) || {}; } catch (x) {} if (d.event && d.event !== "message") return; ntGot(); };
+        es.onerror = function () { if (es.readyState === 2 && nt.es === es) nt.es = null; };
+        nt.es = es;
+      } catch (e) { nt.es = null; }
+    } else if (!want && nt.es) { try { nt.es.close(); } catch (e) {} nt.es = null; }
+  }
+  function ntGot() {
+    if (mode !== "shukko") return;
+    nt.shown = true;
+    ntSubSet(pk.open ? "伝票を 閉じると 一覧に 出ます" : "一覧を 読み直して います…");
+    $("ntBar").classList.remove("hidden");
+    try { tone(660, 0, 0.12); } catch (e) {}
+    softSlips(); setTimeout(softSlips, 8000);   // サーバーの 控えが 古い 時の ため もう 1回
+  }
+  $("ntX").addEventListener("click", function () { ntHide(); focusScan(); });
+  $("ntGo").addEventListener("click", function () {
+    ntHide();
+    if (mode !== "shukko") return;
+    pkTab = "take"; pk.open = ""; pk.msg = null; loadSlips(); window.scrollTo(0, 0); focusScan();
+  });
+  document.addEventListener("visibilitychange", ntSync);
+
+  // ══ 予約の 中身（147）— 在庫検索の「予約あり」を タップ。PC の 出庫画面の「予約 ×N」と 同じ 行（これからの 分だけ）══
+  var yySeq = 0;
+  function ymdNow() { var d = new Date(); return d.getFullYear() + "/" + ("0" + (d.getMonth() + 1)).slice(-2) + "/" + ("0" + d.getDate()).slice(-2); }
+  function openYoyaku(c, id) {
+    var my = ++yySeq;
+    $("yyT").textContent = "予約 — " + c + "-" + id;
+    $("yyS").textContent = "これからの 出庫予定";
+    $("yyL").innerHTML = '<div class="empty-msg">読み込み中…</div>';
+    $("yyAsk").classList.remove("hidden");
+    apiGet({ api: "yoyaku", client: c, id: id }).then(function (j) {
+      if (my !== yySeq) return;
+      var today = ymdNow();
+      var list = (j.yoyaku || []).filter(function (y) { return !y.depart || y.depart > today; });   // 出庫日に なったら 予約では なく 出庫
+      $("yyL").innerHTML = list.length ? list.map(function (y) {
+        return '<div class="yy-row"><div class="yy-top"><b>' + esc(inDay(y.depart) || "日付なし") + " 出庫</b><span class=\"yy-q\">×" + esc(y.qty) + "</span></div>" +
+          '<div class="yy-sub">' + esc([y.hikitori, y.tantou, y.unso].filter(Boolean).join("・") || "—") + "</div>" +
+          (y.memo ? '<div class="yy-sub">メモ: ' + esc(y.memo) + "</div>" : "") +
+          '<div class="yy-sub dim">伝票 ' + esc(y.made || "") + "</div></div>";
+      }).join("") : '<div class="empty-msg">これからの 予約は ありません</div>';
+    }).catch(function (e) { if (my === yySeq) $("yyL").innerHTML = '<div class="empty-msg">読めませんでした: ' + esc((e && e.message) || String(e)) + "</div>"; });
+  }
+  $("yyX").addEventListener("click", function () { yySeq++; $("yyAsk").classList.add("hidden"); focusScan(); });
 
   // ── はじめ ──
   if (!API) show("vSetup");
